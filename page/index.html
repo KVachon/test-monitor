@@ -135,14 +135,29 @@ main{padding-block:28px 40px}
 /* failures */
 .failsec .hd h2{color:var(--ink)}
 .fails{display:grid}
-.fl{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:4px 18px;padding:12px 0;border-top:1px solid var(--hair);font-size:13px;animation:in .35s ease-out}
-.fl:first-child{border-top:0;padding-top:2px}
+/* one line per failing feature, opened to show its tests; tests that failed the same way share a line */
+.fg{border-top:1px solid var(--hair);animation:in .35s ease-out}
+.fg:first-child{border-top:0}
 @keyframes in{from{opacity:0;transform:translateY(-3px)}}
-.fl .id{display:flex;align-items:center;gap:8px;font:500 12.5px var(--mono);color:var(--fail);overflow-wrap:anywhere;min-width:0}
-.fl .id::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
-.fl.y .id{color:var(--flaky)}
-.fl .d{color:var(--ink)}
-.fl .why{grid-column:2;justify-self:start;font:12px/1.5 var(--mono);color:var(--ink-2);background:var(--raise);border:1px solid var(--hair);border-radius:6px;padding:2px 8px;overflow-wrap:anywhere;max-width:100%}
+.fh{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) auto 10px;gap:14px;align-items:center;padding:9px 0;font-size:13px}
+.fh:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:2px;border-radius:6px}
+.fh .id{display:flex;align-items:center;gap:8px;font:500 12.5px var(--mono);color:var(--fail);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fh .id::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.fg.y .fh .id{color:var(--flaky)}
+.fh .sm{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fh .sm small{color:var(--ink-3);font-size:12px;margin-left:6px}
+.fh .ct{font:12px var(--mono);color:var(--ink-3);white-space:nowrap}
+.fh .cv{width:10px;height:10px;color:var(--ink-3);transition:transform .15s}
+.fh[aria-expanded="true"] .cv{transform:rotate(90deg)}
+.fh:hover .sm,.fh:hover .cv{color:var(--ink)}
+.fb{display:grid;gap:10px;padding:0 0 14px 164px}
+.fb[hidden]{display:none}
+.fr{display:grid;gap:4px;min-width:0}
+.fr .tn{font:12px var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.fr .tn small{color:var(--ink-3);font-size:11.5px}
+.fr .why{justify-self:start;font:12px/1.5 var(--mono);color:var(--ink-2);background:var(--raise);border:1px solid var(--hair);border-radius:6px;padding:2px 8px;overflow-wrap:anywhere;max-width:100%;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;cursor:pointer}
+.fr .why.full{-webkit-line-clamp:unset}
 .none{display:flex;align-items:center;gap:9px;margin:0;color:var(--ink-3);font-size:13px}
 .none svg{flex:none;color:var(--pass)}
 .none[hidden]{display:none}
@@ -168,7 +183,7 @@ main{padding-block:28px 40px}
   .right{grid-column:1 / -1;grid-template-columns:auto 1fr;align-items:center;justify-items:start;gap:12px}
   .counts{justify-self:end}
   .el{font-size:24px}
-  .fl{grid-template-columns:minmax(0,1fr)}.fl .why{grid-column:1}
+  .fh{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto 10px;gap:10px}.fh .id{max-width:90px}.fb{padding-left:14px}
   .now{grid-template-columns:auto minmax(0,1fr)}.now .id{max-width:none}.now .d,.now .eta{grid-column:1 / -1;text-align:left}
   .grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
   .grid.keyed{grid-template-columns:repeat(auto-fill,minmax(50px,1fr))}
@@ -305,7 +320,7 @@ function resetModel(){
   if(prevMs.length>=5){CEIL=Math.max(50,prevMs.at(-1)*2);FLOOR=Math.max(1,Math.min(prevMs[Math.floor(prevMs.length*.05)]*.5,CEIL/20))}
   else{CEIL=5000;FLOOR=5}
   expectMs=prev?.durationMs||0;
-  $('suites').innerHTML='';$('fails').innerHTML='';$('none').hidden=false;$('fc').textContent='';
+  $('suites').innerHTML='';$('fails').innerHTML='';fby=new Map();nF=0;nY=0;$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
   $('nk').textContent='';$('ni').textContent='';$('nd').textContent='';
   $('dot').className='orb'+(R?' run':'');$('h').textContent=R?'Running tests':'Waiting for a test run';
@@ -406,11 +421,31 @@ function finish(it,ev){const o=it.g,s=o.suite;o.done++;
   else{pass++;it.st=ev.status==='flaky'?'y':'p';if(ev.status==='flaky')addFail(it,ev.reason||'passed on retry',1)}
   it.done=true;o.fill.style.width=(o.done/o.items.length*100)+'%';o.el.classList.toggle('bad',!!o.bad);setTick(it);if(shown===o)count(o);
   if(cur===it)cur=null}
-function addFail(it,why,fl){$('none').hidden=true;const e=document.createElement('div');e.className='fl'+(fl?' y':'');
-  const keyed=it.g.name&&it.g.name!==it.g.key;
-  e.innerHTML=`<span class="id">${esc(keyed?it.id:it.g.key)}</span><span class="d">${esc(it.d||it.id)}</span><span class="why">${fl?'flaky · ':''}${esc(why)}</span>`;
-  $('fails').appendChild(e);const nf=$('fails').querySelectorAll('.fl:not(.y)').length,ny=$('fails').querySelectorAll('.fl.y').length;
-  $('fc').textContent=`${nf} failed`+(ny?` · ${ny} flaky`:'')}
+// Failures, one line per feature. A feature opens to list its tests, and tests that failed for the same
+// reason share one entry. The first failing feature starts open; the rest open on click.
+let fby=new Map(),nF=0,nY=0;
+const chev='<svg class="cv" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 2l3 3-3 3"/></svg>';
+function addFail(it,why,fl){$('none').hidden=true;const o=it.g;let f=fby.get(o);
+  if(!f){f={o,n:0,y:0,rs:[],open:fby.size===0};const e=document.createElement('div');e.className='fg';
+    e.innerHTML=`<button class="fh"><span class="id"></span><span class="sm"></span><span class="ct num"></span>${chev}</button><div class="fb"></div>`;
+    $('fails').appendChild(e);f.el=e;f.btn=e.firstChild;f.body=e.lastChild;
+    f.btn.onclick=()=>{f.open=!f.open;drawFail(f)};
+    f.body.onclick=ev=>{const w=ev.target.closest('.why');if(w)w.classList.toggle('full')};fby.set(o,f)}
+  if(fl){f.y++;nY++}else{f.n++;nF++}
+  let r=f.rs.find(r=>r.why===why&&r.fl===!!fl);if(!r)f.rs.push(r={why,fl:!!fl,items:[]});r.items.push(it);
+  drawFail(f);$('fc').textContent=`${nF} failed`+(nY?` · ${nY} flaky`:'')}
+function drawFail(f){const o=f.o,keyed=o.name&&o.name!==o.key;
+  f.el.classList.toggle('y',!f.n);f.btn.setAttribute('aria-expanded',f.open);
+  f.btn.querySelector('.id').textContent=o.key;f.btn.title=keyed?`${o.key} · ${o.name}`:o.key;
+  // Closed, the line says why most of them failed; open, it names the feature.
+  const top=[...f.rs].sort((a,b)=>b.items.length-a.items.length)[0];
+  f.btn.querySelector('.sm').innerHTML=f.open?esc(keyed?o.name:''):esc((top.fl?'flaky · ':'')+top.why)+(f.rs.length>1?`<small>+${f.rs.length-1} other reason${f.rs.length>2?'s':''}</small>`:'');
+  f.btn.querySelector('.ct').textContent=[f.n?`${f.n} failed`:'',f.y?`${f.y} flaky`:''].filter(Boolean).join(' · ');
+  f.body.hidden=!f.open;if(!f.open){f.body.innerHTML='';return}
+  const nm=it=>keyed?it.id:(it.d||it.id);
+  f.body.innerHTML=f.rs.map(r=>{const ids=r.items.slice(0,4).map(nm).join(', '),more=r.items.length>4?` <small>+${r.items.length-4} more</small>`:'';
+    const one=r.items.length===1&&keyed&&r.items[0].d&&r.items[0].d!==r.items[0].id?` <small>${esc(r.items[0].d)}</small>`:'';
+    return `<div class="fr"><span class="tn" title="${esc(r.items.map(nm).join('\n'))}">${esc(ids)}${more}${one}</span><span class="why">${r.fl?'flaky · ':''}${esc(r.why)}</span></div>`}).join('')}
 function finish_run(status){finished=true;cur=null;groups.forEach(x=>{x.el.classList.remove('live');if(x.done)x.el.classList.remove('idle')});
   groups.forEach(o=>o.items.forEach(it=>{if(it.st==='r'){it.st='';setTick(it)}}));
   const bad=fail>0||status==='fail';
@@ -435,24 +470,33 @@ const GUT=44;
 // last run, and a new test is added at the end of its row.
 let cellsAt=[];
 const shade=ms=>{const v=Math.min(1,Math.max(0,Math.log(Math.max(ms,FLOOR)/FLOOR)/Math.log(CEIL/FLOOR)));return .1+.85*v};
-function layout(){const svg=$('svg'),W=svg.clientWidth||1000,narrow=W<520,LW=narrow?76:132;
+function layout(){const svg=$('svg'),W=svg.clientWidth||1000,narrow=W<520;
+  // A big run (many features) sets its features in two columns, so the grid stays about half as tall.
+  const two=!narrow&&W>=720&&groups.length>14,CG=32,colW=two?(W-CG)/2:W,LW=narrow?76:two?112:132;
   const maxN=Math.max(8,...groups.map(o=>o.items.length));
   // Squares stay big enough to see and hover; a long feature wraps onto more lines rather than shrinking them.
-  const cs=Math.max(narrow?12:10,Math.min(16,Math.floor((W-LW)/maxN))),gap=2,SH=22,per=Math.max(1,Math.floor((W-LW)/cs));
+  const cs=Math.max(narrow?12:10,Math.min(16,Math.floor((colW-LW)/maxN))),gap=2,SH=22,per=Math.max(1,Math.floor((colW-LW)/cs)),pad=cs<13?13-cs:0;
+  const hOf=o=>{const lines=Math.max(1,Math.ceil(o.items.length/per));return lines*cs+(lines>1?3:0)+pad};
   const rows=[];let yy=0;
   suites.forEach((su,k)=>{if(suites.length>1){rows.push({suite:su,y:yy});yy+=SH}
-    su.groups.forEach(o=>{const lines=Math.max(1,Math.ceil(o.items.length/per));rows.push({g:o,y:yy});yy+=lines*cs+(lines>1?3:0)});if(k<suites.length-1)yy+=6});
-  return {svg,W,LW,cs,gap,per,rows,H:Math.max(yy,cs),narrow}}
+    const gs=su.groups,tot=gs.reduce((a,o)=>a+hOf(o),0);let y=yy,x=0,acc=0,bottom=yy;
+    gs.forEach(o=>{
+      // Move to the second column once the first holds half the height.
+      if(two&&!x&&acc>0&&acc+hOf(o)/2>tot/2){x=colW+CG;y=yy}
+      rows.push({g:o,x,y});y+=hOf(o);acc+=hOf(o);bottom=Math.max(bottom,y)});
+    yy=bottom;if(k<suites.length-1)yy+=6});
+  return {svg,W,LW,cs,gap,per,rows,H:Math.max(yy,cs),narrow,two}}
 function runMs(it){return clock-Math.min(it.at,it.g.suite.lastEnd??it.at)}
 function draw(){const {svg,W,LW,cs,gap,per,rows,H,narrow}=layout();svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('height',H);
   const c=cs-gap,rx=c>=10?2.5:c>=6?1.5:1,hv=hover;let s='';cellsAt=[];
   rows.forEach(r=>{
     if(r.suite){s+=`<text x="0" y="${r.y+13}" font-size="10.5" font-family="IBM Plex Mono,ui-monospace,monospace" fill="#7b7b83">${esc(r.suite.label)}</text>`;return}
-    const o=r.g,keyed=o.name&&o.name!==o.key,ty=r.y+c/2+3.5;
-    const fit=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
-    s+=`<text x="0" y="${ty}" font-size="11" font-family="IBM Plex Mono,ui-monospace,monospace" fill="${o.bad?'#ff5f57':'#b4b4ba'}">${esc(fit(o.key,Math.floor((LW-8)/6.7)))}</text>`;
-    if(keyed&&!narrow)s+=`<text x="${o.key.length*6.8+8}" y="${ty}" font-size="11.5" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(o.name.length>13?o.name.slice(0,12)+'…':o.name)}</text>`;
-    o.items.forEach((it,i)=>{const x=LW+(i%per)*cs,y=r.y+Math.floor(i/per)*cs;cellsAt.push([x,y,it]);let fill='#fff',op=.045,extra='';
+    const o=r.g,keyed=o.name&&o.name!==o.key,ty=r.y+c/2+3.5,X=r.x;
+    const fit=(t,n)=>t.length>n?t.slice(0,Math.max(1,n-1))+'…':t;
+    s+=`<text x="${X}" y="${ty}" font-size="11" font-family="IBM Plex Mono,ui-monospace,monospace" fill="${o.bad?'#ff5f57':'#b4b4ba'}">${esc(fit(o.key,Math.floor((LW-8)/6.7)))}</text>`;
+    const nx=o.key.length*6.8+8,room=Math.floor((LW-nx-8)/6.4);
+    if(keyed&&!narrow&&room>=4)s+=`<text x="${X+nx}" y="${ty}" font-size="11.5" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(fit(o.name,room))}</text>`;
+    o.items.forEach((it,i)=>{const x=X+LW+(i%per)*cs,y=r.y+Math.floor(i/per)*cs;cellsAt.push([x,y,it]);let fill='#fff',op=.045,extra='';
       if(it.done){if(it.st==='f'){fill='#ff5f57';op=1}else if(it.st==='y'){fill='#f0b545';op=.9}else if(it.st==='s'){op=0;extra=` stroke="#fff" stroke-opacity=".28" stroke-width="1"`}else op=shade(it.ms)}
       else if(it===cur&&!finished){op=Math.max(.25,shade(runMs(it)))}
       if(it===hv)extra+=` stroke="#fff" stroke-width="1.5"`;
@@ -567,7 +611,8 @@ async function loadTrend(){try{const res=await fetch(api('/api/history?limit=30'
 function drawTrend(){const sec=$('trend');if(!TH||TH.runs.length<2||!TH.features.length){sec.hidden=true;return}sec.hidden=false;
   const svg=$('tsvg'),W=svg.clientWidth||1000,narrow=W<520,LW=narrow?48:140,RW=narrow?0:150,mono='font-family="IBM Plex Mono,ui-monospace,monospace"';
   const room=W-LW-RW,k=Math.min(TH.runs.length,Math.floor(room/16)),off=TH.runs.length-k,runs=TH.runs.slice(off);
-  const cs=Math.min(36,Math.floor(room/k)),ch=narrow?12:15,RH=narrow?17:21,g=3;
+  // Many features: shorter rows, so a big suite's history stays about a screen tall.
+  const many=TH.features.length>14,cs=Math.min(36,Math.floor(room/k)),ch=many?9:narrow?12:15,RH=many?13:narrow?17:21,g=3;
   $('trh').textContent=`Last ${k} runs${TH.project?' · '+TH.project:''}`;
   $('trl').innerHTML=`<i class="f"></i> failed <i class="y"></i> flaky <i style="opacity:.25"></i><i style="opacity:.85"></i> quicker → slower than usual`;
   let s='',y=0;tCells=[];
@@ -577,11 +622,11 @@ function drawTrend(){const sec=$('trend');if(!TH||TH.runs.length<2||!TH.features
     s+=`<circle cx="${cx}" cy="6" r="3" fill="${r.status==='pass'?'#5ad46d':r.status==='fail'?'#ff5f57':'#4e4e55'}"/>`});
   y=18;let lastSuite=null;const multi=new Set(TH.features.map(f=>f.suite)).size>1;
   TH.features.forEach(f=>{
-    if(multi&&f.suite!==lastSuite){s+=`<text x="0" y="${y+13}" font-size="10.5" ${mono} fill="#7b7b83">${esc(f.label)}</text>`;y+=20}lastSuite=f.suite;
+    if(multi&&f.suite!==lastSuite){s+=`<text x="0" y="${y+(many?16:13)}" font-size="10.5" ${mono} fill="#7b7b83">${esc(f.label)}</text>`;y+=many?22:20}lastSuite=f.suite;
     const cells=f.cells.slice(off),cy=y+RH/2,keyed=f.name&&f.name!==f.group;
     const ms=cells.filter(Boolean).map(c=>c.ms).sort((a,b)=>a-b),med=ms[Math.floor(ms.length/2)]||1,timed=ms.at(-1)>0;
     const bad=cells.at(-1)?.fail.length;
-    s+=`<text x="0" y="${cy+3.5}" font-size="10.5" ${mono} fill="${bad?'#ff5f57':'#b4b4ba'}">${esc(narrow&&f.group.length>6?f.group.slice(0,5)+'…':f.group)}</text>`;
+    s+=`<text x="0" y="${cy+3.5}" font-size="${many?10:10.5}" ${mono} fill="${bad?'#ff5f57':'#b4b4ba'}">${esc(narrow&&f.group.length>6?f.group.slice(0,5)+'…':f.group)}</text>`;
     if(keyed&&!narrow)s+=`<text x="${f.group.length*6.5+8}" y="${cy+3.5}" font-size="11" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(f.name.length>12?f.name.slice(0,11)+'…':f.name)}</text>`;
     cells.forEach((c,i)=>{const x=LW+i*cs,run=runs[i];tCells.push([x,cy-ch/2,f,c,run]);const on=tHover&&tHover[2]===f&&tHover[4]===run;
       let a;if(!c)a=`fill="none" stroke="#fff" stroke-opacity=".08"`;
@@ -589,7 +634,7 @@ function drawTrend(){const sec=$('trend');if(!TH||TH.runs.length<2||!TH.features
       else a=`fill="#fff" fill-opacity="${(timed?Math.min(.92,Math.max(.14,.45*Math.pow(c.ms/med,1.4))):.4).toFixed(2)}"`;
       s+=`<rect x="${x+(c?0:.5)}" y="${cy-ch/2+(c?0:.5)}" width="${cs-g-(c?0:1)}" height="${ch-(c?0:1)}" rx="2.5" ${a}${on?' stroke="#fff" stroke-width="1.5"':''}/>`});
     if(RW&&timed){const vals=cells.map(c=>c?c.ms:null),pts=[],sx=LW+k*cs+14,sw=Math.min(RW-70,W-LW-k*cs-80),lo=Math.min(...ms),hi=Math.max(...ms);
-      vals.forEach((v,i)=>{if(v!=null)pts.push([sx+(k>1?i/(k-1):0)*sw,cy+5-(hi>lo?(v-lo)/(hi-lo):.5)*11])});
+      vals.forEach((v,i)=>{if(v!=null)pts.push([sx+(k>1?i/(k-1):0)*sw,cy+(many?4:5)-(hi>lo?(v-lo)/(hi-lo):.5)*(many?8:11)])});
       if(pts.length>1)s+=`<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${pts.at(-1)[0].toFixed(1)}" cy="${pts.at(-1)[1].toFixed(1)}" r="2.5" fill="#fff"/>`;
       // The latest run against the usual time before it.
       const last=vals.at(-1),before=vals.slice(0,-1).filter(v=>v!=null).sort((a,b)=>a-b),bm=before[Math.floor(before.length/2)];
