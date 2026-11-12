@@ -26,6 +26,9 @@ cat > "$PLIST" <<PL
 </dict></plist>
 PL
 launchctl unload "$PLIST" 2>/dev/null || true
+# Stop a monitor started by hand, so the LaunchAgent can take the port.
+lsof -ti tcp:7357 -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
+sleep 1
 launchctl load "$PLIST"
 echo "✓ LaunchAgent loaded ($PLIST)"
 

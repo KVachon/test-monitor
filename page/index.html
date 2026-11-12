@@ -236,8 +236,8 @@ function resetModel(){
   marks=[];ends=[];wi=0;suiteAt=[];live_=0;trail=[];lastRate=0;maxRate=0;
   const prev=R&&R.previous;
   skel={};(prev?.suites||[]).forEach(s=>skel[s.suite]=s);
-  PEAK0=prev?.peak>=30?prev.peak:300;peak=PEAK0;
-  expectMs=prev?.durationMs||0;full=Math.max(20000,expectMs*1.02);
+  PEAK0=prev?.peak>=30?prev.peak*1.15:300;peak=PEAK0;
+  expectMs=prev?.durationMs||0;full=expectMs?expectMs*1.08:120000;
   $('suites').innerHTML='';$('fails').innerHTML='';$('axis').innerHTML='';$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
   $('nk').textContent='';$('ni').textContent='';$('nd').textContent='';
@@ -368,11 +368,13 @@ function timeLeft(){if(!total||finished)return null;const avg=doneN?doneMs/doneN
   if(unknown)return null;if(cur&&cur.at!=null)left=Math.max(0,left-(clock-cur.at));return left}
 function draw(){const svg=$('svg'),W=svg.clientWidth||1000,H=svg.clientHeight||112,top=16,bot=H-3;svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   // The time axis starts from the last run's length and only grows, gradually, so the line barely moves.
-  const left=timeLeft(),wantFull=Math.max(clock*1.02,left!=null?(clock+left)*1.02:clock*1.15);if(wantFull>full)full+=(wantFull-full)*.1;
+  // Both scales are set when the run starts (from the last run) and stay put, so a point never moves once drawn.
+  // Only if the run outgrows one does it change, in a single step, with plenty of room so it rarely happens twice.
+  if(clock>full*.97){const left=timeLeft();full=Math.max(full*2,(clock+(left||0))*1.25)}
   const x=t=>t/full*W;
   // One point per 2px column (the first one to land there, so it never changes), plus the dot.
   const S=[];let col=-1;trail.forEach(p=>{const c=Math.floor(x(p[0])/2);if(c>col){S.push(p);col=c}});if(trail.length&&S.at(-1)!==trail.at(-1))S.push(trail.at(-1));
-  maxRate=Math.max(maxRate,live_);const want=Math.max(30,live_)*1.15;if(want>peak)peak+=(want-peak)*.1;// grows only, and gradually
+  maxRate=Math.max(maxRate,live_);if(live_>peak*.95)peak=Math.max(peak*2,live_*1.5);
   const y=v=>bot-Math.sqrt(v/peak)*(bot-top);
   let s=`<defs><pattern id="dt" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#fff" fill-opacity=".38"/></pattern>
     <linearGradient id="fd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity=".15"/></linearGradient>
