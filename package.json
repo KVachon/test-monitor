@@ -1,0 +1,17 @@
+{
+  "name": "test-monitor",
+  "version": "0.1.0",
+  "description": "A live page for test runs, from any project and any machine.",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "bin": {
+    "testwatch": "bin/testwatch.js",
+    "test-monitor": "bin/test-monitor.js"
+  },
+  "scripts": {
+    "start": "node bin/test-monitor.js",
+    "demo": "cd examples/demo && node ../../bin/testwatch.js",
+    "test": "node --test test/*.test.js"
+  }
+}
