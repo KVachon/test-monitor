@@ -96,4 +96,20 @@ test('history: one row per feature across the last runs, oldest first', async ()
     assert.strictEqual(h.features[0].label, 'unit');
   });
 });
+test('history: a run of one feature shares rows with the full run', async () => {
+  await withServer({}, async base => {
+    const at = Date.now() - 5000, ev = (run, t, label, groups) => [
+      { type: 'run-start', run, project: 'q', t },
+      { type: 'suite-start', run, suite: label, label, t },
+      ...groups.map((g, i) => ({ type: 'test-end', run, suite: label, id: g + '-a', group: g, status: 'pass', ms: 5, t: t + i + 1 })),
+      { type: 'run-end', run, status: 'pass', t: t + 50 }];
+    await post(base, ev('f1', at, './tests/run.sh', ['F1', 'F2', 'F3']));
+    await post(base, ev('f2', at + 100, './tests/run.sh F2', ['F2']));
+    const h = await (await fetch(base + '/api/history?project=q')).json();
+    assert.deepStrictEqual(h.features.map(f => f.group), ['F1', 'F2', 'F3']);
+    assert.ok(h.features.every(f => f.label === 'tests/run.sh'));
+    assert.strictEqual(h.features[1].cells[1].n, 1);
+    assert.strictEqual(h.features[0].cells[1], null);
+  });
+});
 });
