@@ -95,5 +95,6 @@ Put it in the project root. `testwatch` with no arguments runs every suite in it
 ```
 
 - A rule's named groups can be `id`, `desc`, `reason` and `group`. The first rule that matches a line wins.
+- `shell` names the shell for a suite's command (for example `bash` for `.sh` scripts on Windows).
 - `group.match` takes the group from the id (the first capture). `upper` uppercases it.
 - `groupNames` maps a group key to its name.

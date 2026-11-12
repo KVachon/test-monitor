@@ -1,0 +1,25 @@
+{
+  "project": "amchp-member-portal",
+  "url": "http://Kurts-Mac-mini.local:7357",
+  "suites": [
+    {
+      "name": "php",
+      "label": "tests/run.sh",
+      "command": "./tests/run.sh",
+      "shell": "bash",
+      "reader": "pattern",
+      "rules": [
+        { "match": "^pass\\s+(?<id>\\S+)\\s+(?<desc>.*)$", "status": "pass" },
+        { "match": "^FAIL\\s+(?<id>\\S+)\\s+(?<reason>.*)$", "status": "fail" }
+      ],
+      "group": { "match": "^([a-z]+\\d+)-", "upper": true }
+    },
+    {
+      "name": "browser",
+      "label": "tests/browser.sh",
+      "command": "./tests/browser.sh",
+      "shell": "bash",
+      "reader": "marker"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ Node 18 or later, no dependencies. Works on macOS and Windows.
 
 - [docs/convention.md](docs/convention.md): the one structure every test suite follows, and the event format.
 - [docs/setup-mac-mini.md](docs/setup-mac-mini.md): running it on the mini, with the tunnel and token.
+- [docs/claude-setup.md](docs/claude-setup.md): the hook and CLAUDE.md rule that make it the default.
 - [docs/brief.md](docs/brief.md): the starting brief.
 - [design/mockup-template.html](design/mockup-template.html): the agreed design the page is built from.
 
