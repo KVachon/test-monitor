@@ -236,7 +236,7 @@ function resetModel(){
   marks=[];ends=[];wi=0;suiteAt=[];live_=0;trail=[];lastRate=0;maxRate=0;
   const prev=R&&R.previous;
   skel={};(prev?.suites||[]).forEach(s=>skel[s.suite]=s);
-  PEAK0=prev?.peak>=30?prev.peak*1.15:300;peak=PEAK0;
+  PEAK0=prev?.peak>=30?prev.peak*1.35:300;peak=PEAK0;
   expectMs=prev?.durationMs||0;full=expectMs?expectMs*1.08:120000;
   $('suites').innerHTML='';$('fails').innerHTML='';$('axis').innerHTML='';$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
