@@ -79,4 +79,21 @@ test('the stream says hello with the latest run, then sends new events', async (
     ctl.abort();
   });
 });
+test('history: one row per feature across the last runs, oldest first', async () => {
+  await withServer({}, async base => {
+    const at = Date.now() - 5000;
+    await post(base, runEvents('h1', at, true));
+    await post(base, runEvents('h2', at + 200, false));
+    const h = await (await fetch(base + '/api/history?project=p')).json();
+    assert.strictEqual(h.project, 'p');
+    assert.deepStrictEqual(h.runs.map(r => r.id), ['h1', 'h2']);
+    assert.strictEqual(h.features.length, 1);
+    const [c1, c2] = h.features[0].cells;
+    assert.deepStrictEqual(c1.fail, ['b']);
+    assert.strictEqual(c1.n, 2);
+    assert.deepStrictEqual(c2.fail, []);
+    assert.ok(c2.ms >= 40);
+    assert.strictEqual(h.features[0].label, 'unit');
+  });
+});
 });

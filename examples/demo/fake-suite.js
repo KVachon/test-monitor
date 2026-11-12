@@ -30,17 +30,24 @@ if (mode === 'markers') {
   const fails = { 23: 'expected status 413, got 200', 97: "body has 'Covers the' nowhere", 180: 'expected 6 pills, found 5' };
   (async () => {
     say({ type: 'suite-start', tests });
+    let failed = 0;
     for (let i = 0; i < tests.length; i++) {
       const t = tests[i];
       say({ type: 'test-start', id: t.id, group: t.group });
       process.stdout.write(`… ${t.id}`);
-      const ms = (150 + rnd() * rnd() * 1800) * pace[t.group] + (i === 0 || tests[i - 1].group !== t.group ? 2500 + rnd() * 3000 : 0);
+      // DEMO_RUN=n makes runs differ like real ones: timings wobble, a flaky test fails now and then, one
+      // failure gets fixed at run 6, a new one appears at run 9, and F6 gets slower from run 8.
+      const k = process.env.DEMO_RUN ? Number(process.env.DEMO_RUN) : null, wob = k == null ? 1 : 0.75 + Math.random() * 0.5;
+      const ms = wob * (k != null && k >= 8 && t.group === 'F6' ? 1.8 : 1) * ((150 + rnd() * rnd() * 1800) * pace[t.group] + (i === 0 || tests[i - 1].group !== t.group ? 2500 + rnd() * 3000 : 0));
       await sleep(ms);
-      const status = fails[i] ? 'fail' : i === 140 ? 'flaky' : i === 60 ? 'skip' : 'pass';
+      let fail = fails[i];
+      if (k != null) { if (i === 97 && k >= 6) fail = null; if (i === 180 && k < 9) fail = null; if (i === 23 && Math.random() < .3) fail = null; if (i === 200 && Math.random() < .25) fail = 'timed out after 5000ms'; }
+      if (fail) failed++;
+      const status = fail ? 'fail' : i === 140 && (k == null || Math.random() < .4) ? 'flaky' : i === 60 ? 'skip' : 'pass';
       process.stdout.write(`\r${status === 'fail' ? 'FAIL' : status.padEnd(4)}  ${t.id}\n`);
-      say({ type: 'test-end', id: t.id, group: t.group, status, ms: Math.round(ms / speed), reason: fails[i] || (status === 'flaky' ? 'timed out once, passed on retry' : status === 'skip' ? 'needs a mail server' : undefined) });
+      say({ type: 'test-end', id: t.id, group: t.group, status, ms: Math.round(ms / speed), reason: fail || (status === 'flaky' ? 'timed out once, passed on retry' : status === 'skip' ? 'needs a mail server' : undefined) });
     }
-    process.exit(Object.keys(fails).length ? 1 : 0);
+    process.exit(failed ? 1 : 0);
   })();
 } else {
   const files = ['home', 'search', 'checkout', 'account', 'staff-requests'];
