@@ -12,6 +12,6 @@
   "scripts": {
     "start": "node bin/test-monitor.js",
     "demo": "cd examples/demo && node ../../bin/testwatch.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test \"test/*.test.js\""
   }
 }
