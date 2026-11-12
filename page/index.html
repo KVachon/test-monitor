@@ -100,6 +100,7 @@ main{padding-block:28px 40px}
 .suite{display:grid;gap:10px}
 .suite+.suite{margin-top:20px}
 .sl{display:flex;align-items:center;gap:10px;font:500 11.5px var(--mono);color:var(--ink-3);white-space:nowrap}
+.sl{overflow:hidden;min-width:0}
 .sl::after{content:"";flex:1;height:1px;background:var(--hair)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:6px}
 .cell{all:unset;box-sizing:border-box;cursor:pointer;position:relative;border:1px solid var(--hair);border-radius:var(--r);padding:9px 10px 10px;display:grid;gap:8px;min-width:0;
@@ -162,6 +163,42 @@ main{padding-block:28px 40px}
   .grid.keyed .cell:not(.br) .n{display:none}
   .sim{display:none}.foot{justify-content:flex-end}
 }
+
+/* run history: a second panel under the live one, so the live panel's layout never changes */
+.hist{margin-top:16px;gap:12px;padding-bottom:16px}
+.hist .hd{margin-bottom:0;align-items:center}
+.hist .hd h2{color:var(--ink)}
+.hctl{display:flex;gap:8px;align-items:center;min-width:0}
+.hist .seg{overflow-x:auto;max-width:100%;scrollbar-width:none}
+.hist .seg button{white-space:nowrap}
+.runs{display:grid}
+.run{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;column-gap:14px;row-gap:2px;align-items:center;
+  padding:10px 12px;margin:0 -12px;border-radius:var(--r);transition:background .15s}
+.run+.run{box-shadow:0 -1px 0 var(--hair)}
+.run:hover{background:rgba(255,255,255,.03)}
+.run:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:-2px}
+.run[aria-current="true"]{background:rgba(255,255,255,.055)}
+.run .o{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.run .o.pass{background:var(--pass);box-shadow:0 0 8px rgba(90,212,109,.5)}
+.run .o.fail{background:var(--fail);box-shadow:0 0 8px rgba(255,95,87,.5)}
+.run .o.live{background:var(--run);box-shadow:0 0 8px rgba(255,255,255,.6);animation:pulse 1.2s ease-in-out infinite}
+.run .w{min-width:0}
+.run .nm,.run .sub{display:block}
+.run .nm{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run .nm code{font:12px var(--mono);color:var(--ink-3);margin-left:6px}
+.run .sub{font:11.5px var(--mono);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.run .du{font:12px var(--mono);color:var(--ink-3);text-align:right;min-width:56px}
+.run .ct{font-size:12.5px;color:var(--ink-2);white-space:nowrap;text-align:right;min-width:150px}
+.run .ct b{font-weight:600;color:var(--ink)} .run .ct .bad,.run .ct .bad b{color:var(--fail)}
+.hempty{margin:0;color:var(--ink-3);font-size:13px}
+.more{justify-self:start}
+.more[hidden],.hempty[hidden],#livebtn[hidden]{display:none}
+@media (max-width:640px){
+  .hist .hd{flex-wrap:wrap}
+  .run{grid-template-columns:auto minmax(0,1fr) auto}
+  .run .du{display:none}
+  .run .ct{min-width:0}
+}
 </style>
 </head>
 <body>
@@ -206,7 +243,14 @@ main{padding-block:28px 40px}
       <button class="btn" id="again"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.7-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12.5 1.5v3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Replay</button>
     </div>
   </footer>
-</div></main>
+</div>
+  <section class="col panel hist" aria-label="Past runs">
+    <div class="hd"><h2>Runs</h2><div class="hctl"><button class="btn" id="livebtn" hidden>Back to live</button><div class="seg" id="pf" role="group" aria-label="Project"></div></div></div>
+    <div class="runs" id="runs"></div>
+    <p class="hempty" id="hempty" hidden>No runs yet.</p>
+    <button class="btn more" id="more" hidden>Show more</button>
+  </section>
+</main>
 
 <script>
 'use strict';
@@ -214,7 +258,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const qs=new URLSearchParams(location.search);
 const TOKEN=qs.get('token')||'';
-const PIN=qs.get('run');              // ?run=<id> keeps the page on one run
+let PIN=qs.get('run');                // ?run=<id> keeps the page on one run
 const api=p=>p+(TOKEN?(p.includes('?')?'&':'?')+'token='+encodeURIComponent(TOKEN):'');
 const secs=ms=>{const s=Math.max(0,Math.round(ms/1000));return s<60?s+'s':s<3600?Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s':Math.floor(s/3600)+'h '+String(Math.floor(s/60)%60).padStart(2,'0')+'m'};
 const clockTime=t=>new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
@@ -441,13 +485,44 @@ function add(ev){if(!R||ev.run!==R.id||ev.seq<=R.lastSeq)return;
 function connect(){
   const es=new EventSource(api('/api/stream'));
   es.addEventListener('hello',e=>{const h=JSON.parse(e.data);offset=h.serverNow-Date.now();
-    const want=PIN||h.latest;if(want&&(!R||R.id!==want))load(want);else if(R)load(R.id)});
+    latestId=h.latest;const want=PIN||h.latest;if(want&&(!R||R.id!==want))load(want).then(loadRuns);else if(R)load(R.id);loadRuns()});
   es.onmessage=e=>{const ev=JSON.parse(e.data);
+    if(ev.type==='run-start'){latestId=ev.run;refreshRuns()}else if(ev.type==='run-end')refreshRuns();
     if(loading){if(ev.run===loading)pend.push(ev);return}
     // A new run takes over once the one on screen has finished.
-    if(ev.type==='run-start'&&!PIN&&(!R||(R.id!==ev.run&&R.endRel!=null))){load(ev.run);return}
+    if(ev.type==='run-start'&&!PIN&&(!R||(R.id!==ev.run&&R.endRel!=null))){load(ev.run).then(loadRuns);return}
     add(ev)};
 }
+
+// ---------- run history ----------
+let hProject=null,hLimit=20,hTimer=null,latestId=null;
+const dayName=t=>{const d=new Date(t),n=new Date(),y=new Date(n);y.setDate(n.getDate()-1);
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  return same(d,n)?'Today':same(d,y)?'Yesterday':d.toLocaleDateString([],{month:'short',day:'numeric',...(d.getFullYear()!==n.getFullYear()?{year:'numeric'}:{})})};
+async function loadRuns(){
+  try{const q=`/api/runs?limit=${hLimit}`+(hProject?`&project=${encodeURIComponent(hProject)}`:'');
+    const res=await fetch(api(q));if(!res.ok)return;const d=await res.json();
+    // Project filter, only when there's more than one project.
+    $('pf').hidden=d.projects.length<2;
+    $('pf').innerHTML=[null,...d.projects].map(p=>`<button aria-pressed="${p===hProject}" data-p="${esc(p??'')}">${esc(p??'All')}</button>`).join('');
+    $('pf').querySelectorAll('button').forEach(b=>b.onclick=()=>{hProject=b.dataset.p||null;hLimit=20;loadRuns()});
+    $('runs').innerHTML=d.runs.map(m=>{const c=m.counts||{},st=!m.ended?'live':m.status==='fail'?'fail':m.status==='pass'?'pass':'';
+      const counts=!m.ended?'Running':`<b>${c.pass+(c.flaky||0)}</b> passed`+(c.fail?` · <span class="bad"><b>${c.fail}</b> failed</span>`:'')+(c.skip?` · ${c.skip} skipped`:'');
+      return `<button class="run" data-id="${esc(m.id)}" aria-current="${R&&R.id===m.id}"><i class="o ${st}"></i>
+        <span class="w"><span class="nm">${esc(m.project)}<code>${esc(m.command||'')}</code></span><span class="sub">${esc(m.host||'')} · ${dayName(m.started)} ${clockTime(m.started)}</span></span>
+        <span class="du num">${m.ended?secs(m.durationMs):''}</span><span class="ct num">${counts}</span></button>`}).join('');
+    $('runs').querySelectorAll('.run').forEach(b=>b.onclick=()=>openRun(b.dataset.id));
+    $('hempty').hidden=d.runs.length>0;$('more').hidden=d.total<=d.runs.length;
+  }catch{}}
+const refreshRuns=()=>{clearTimeout(hTimer);hTimer=setTimeout(loadRuns,300)};
+$('more').onclick=()=>{hLimit+=40;loadRuns()};
+function setUrl(id){const u=new URLSearchParams(location.search);if(id)u.set('run',id);else u.delete('run');
+  history.pushState({run:id},'',location.pathname+(u.toString()?'?'+u:''))}
+// Opening a past run shows how it ended; Replay plays it again.
+function openRun(id){PIN=id;setUrl(id);$('livebtn').hidden=false;load(id).then(()=>{scrollTo({top:0,behavior:'smooth'});loadRuns()})}
+$('livebtn').onclick=()=>{PIN=null;setUrl(null);$('livebtn').hidden=true;if(latestId)load(latestId).then(loadRuns)};
+addEventListener('popstate',()=>{PIN=new URLSearchParams(location.search).get('run');$('livebtn').hidden=!PIN;const id=PIN||latestId;if(id)load(id).then(loadRuns)});
+$('livebtn').hidden=!PIN;
 [['s1',1],['s10',10],['s60',60]].forEach(([id,v])=>$(id).onclick=()=>{speed=v;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.id===id))});
 $('again').onclick=()=>{if(!R)return;live=false;ci=0;resetModel();show(groups[0]);tick()};
 resetModel();paint();connect();
