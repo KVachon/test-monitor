@@ -172,32 +172,32 @@ main{padding-block:28px 40px}
 .hist .seg{overflow-x:auto;max-width:100%;scrollbar-width:none}
 .hist .seg button{white-space:nowrap}
 .runs{display:grid}
-.run{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;column-gap:14px;row-gap:2px;align-items:center;
+.hrow{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;column-gap:14px;row-gap:2px;align-items:center;
   padding:10px 12px;margin:0 -12px;border-radius:var(--r);transition:background .15s}
-.run+.run{box-shadow:0 -1px 0 var(--hair)}
-.run:hover{background:rgba(255,255,255,.03)}
-.run:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:-2px}
-.run[aria-current="true"]{background:rgba(255,255,255,.055)}
-.run .o{width:8px;height:8px;border-radius:50%;background:var(--faint)}
-.run .o.pass{background:var(--pass);box-shadow:0 0 8px rgba(90,212,109,.5)}
-.run .o.fail{background:var(--fail);box-shadow:0 0 8px rgba(255,95,87,.5)}
-.run .o.live{background:var(--run);box-shadow:0 0 8px rgba(255,255,255,.6);animation:pulse 1.2s ease-in-out infinite}
-.run .w{min-width:0}
-.run .nm,.run .sub{display:block}
-.run .nm{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.run .nm code{font:12px var(--mono);color:var(--ink-3);margin-left:6px}
-.run .sub{font:11.5px var(--mono);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.run .du{font:12px var(--mono);color:var(--ink-3);text-align:right;min-width:56px}
-.run .ct{font-size:12.5px;color:var(--ink-2);white-space:nowrap;text-align:right;min-width:150px}
-.run .ct b{font-weight:600;color:var(--ink)} .run .ct .bad,.run .ct .bad b{color:var(--fail)}
+.hrow+.hrow{box-shadow:0 -1px 0 var(--hair)}
+.hrow:hover{background:rgba(255,255,255,.03)}
+.hrow:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:-2px}
+.hrow[aria-current="true"]{background:rgba(255,255,255,.055)}
+.hrow .o{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.hrow .o.pass{background:var(--pass);box-shadow:0 0 8px rgba(90,212,109,.5)}
+.hrow .o.fail{background:var(--fail);box-shadow:0 0 8px rgba(255,95,87,.5)}
+.hrow .o.live{background:var(--run);box-shadow:0 0 8px rgba(255,255,255,.6);animation:pulse 1.2s ease-in-out infinite}
+.hrow .w{min-width:0}
+.hrow .nm,.hrow .sub{display:block}
+.hrow .nm{font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .nm code{font:12px var(--mono);color:var(--ink-3);margin-left:6px}
+.hrow .sub{font:11.5px var(--mono);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .du{font:12px var(--mono);color:var(--ink-3);text-align:right;min-width:56px}
+.hrow .ct{font-size:12.5px;color:var(--ink-2);white-space:nowrap;text-align:right;min-width:150px}
+.hrow .ct b{font-weight:600;color:var(--ink)} .hrow .ct .bad,.hrow .ct .bad b{color:var(--fail)}
 .hempty{margin:0;color:var(--ink-3);font-size:13px}
 .more{justify-self:start}
 .more[hidden],.hempty[hidden],#livebtn[hidden]{display:none}
 @media (max-width:640px){
   .hist .hd{flex-wrap:wrap}
-  .run{grid-template-columns:auto minmax(0,1fr) auto}
-  .run .du{display:none}
-  .run .ct{min-width:0}
+  .hrow{grid-template-columns:auto minmax(0,1fr) auto}
+  .hrow .du{display:none}
+  .hrow .ct{min-width:0}
 }
 </style>
 </head>
@@ -508,10 +508,10 @@ async function loadRuns(){
     $('pf').querySelectorAll('button').forEach(b=>b.onclick=()=>{hProject=b.dataset.p||null;hLimit=20;loadRuns()});
     $('runs').innerHTML=d.runs.map(m=>{const c=m.counts||{},st=!m.ended?'live':m.status==='fail'?'fail':m.status==='pass'?'pass':'';
       const counts=!m.ended?'Running':`<b>${c.pass+(c.flaky||0)}</b> passed`+(c.fail?` · <span class="bad"><b>${c.fail}</b> failed</span>`:'')+(c.skip?` · ${c.skip} skipped`:'');
-      return `<button class="run" data-id="${esc(m.id)}" aria-current="${R&&R.id===m.id}"><i class="o ${st}"></i>
+      return `<button class="hrow" data-id="${esc(m.id)}" aria-current="${R&&R.id===m.id}"><i class="o ${st}"></i>
         <span class="w"><span class="nm">${esc(m.project)}<code>${esc(m.command||'')}</code></span><span class="sub">${esc(m.host||'')} · ${dayName(m.started)} ${clockTime(m.started)}</span></span>
         <span class="du num">${m.ended?secs(m.durationMs):''}</span><span class="ct num">${counts}</span></button>`}).join('');
-    $('runs').querySelectorAll('.run').forEach(b=>b.onclick=()=>openRun(b.dataset.id));
+    $('runs').querySelectorAll('.hrow').forEach(b=>b.onclick=()=>openRun(b.dataset.id));
     $('hempty').hidden=d.runs.length>0;$('more').hidden=d.total<=d.runs.length;
   }catch{}}
 const refreshRuns=()=>{clearTimeout(hTimer);hTimer=setTimeout(loadRuns,300)};
