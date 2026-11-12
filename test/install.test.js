@@ -26,6 +26,17 @@ test.describe('install', () => {
     } finally { fs.rmSync(home, { recursive: true, force: true }); }
   });
 
+  test('reads the rule from a checkout with Windows line endings', () => {
+    const doc = require('path').join(__dirname, '..', 'docs', 'claude-setup.md');
+    const orig = fs.readFileSync(doc, 'utf8');
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-home-'));
+    try {
+      fs.writeFileSync(doc, orig.replace(/\n/g, '\r\n'));
+      install({ home, token: '', log: () => {} });
+      assert.ok(fs.readFileSync(path.join(home, '.claude', 'CLAUDE.md'), 'utf8').includes(RULE_HEADING));
+    } finally { fs.writeFileSync(doc, orig); fs.rmSync(home, { recursive: true, force: true }); }
+  });
+
   test('works on a machine with no Claude settings yet', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-home-'));
     try {
