@@ -68,8 +68,8 @@ const root = configFile ? path.dirname(configFile) : process.cwd();
 let suites;
 if (adhoc) {
   if (!adhoc.length) usage(2);
-  const command = adhoc.map(a => (/[\s"'$`\\]/.test(a) && process.platform !== 'win32' ? `'${a.replace(/'/g, `'\\''`)}'` : a)).join(' ');
-  suites = [{ name: 'tests', label: opt.label || adhoc.join(' '), command, reader: opt.reader || 'auto', cwd: process.cwd() }];
+  const { command, shell } = require('../lib/quote').commandFor(adhoc);
+  suites = [{ name: 'tests', label: opt.label || adhoc.join(' '), command, shell, reader: opt.reader || 'auto', cwd: process.cwd() }];
 } else {
   const all = config.suites || [];
   if (!all.length) { console.error('testwatch: no .testmonitor.json with suites here. Use: testwatch -- <test command>'); process.exit(2); }
