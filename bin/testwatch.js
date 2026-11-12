@@ -6,6 +6,8 @@
 //   testwatch php browser          run those suites from .testmonitor.json
 //   testwatch -- npm test          run any command (TAP and @@testmonitor lines are read automatically)
 //
+//   testwatch --claude-hook        the Claude Code hook (see lib/hook.js)
+//
 // Options: --project NAME  --label TEXT  --reader auto|tap|pattern|marker  --url URL
 // Environment: TESTMONITOR_URL (default http://localhost:7357), TESTMONITOR_TOKEN (or ~/.test-monitor/token).
 // The exit code is the test command's.
@@ -25,6 +27,7 @@ function usage(code) {
 
 // ---- arguments ----
 const argv = process.argv.slice(2);
+if (argv[0] === '--claude-hook') { require('../lib/hook').runHook(); return; }
 const dash = argv.indexOf('--');
 const own = dash >= 0 ? argv.slice(0, dash) : argv;
 const adhoc = dash >= 0 ? argv.slice(dash + 1) : null;
@@ -110,7 +113,7 @@ function runSuite(s) {
 
     child = spawn(s.command, {
       cwd: s.cwd,
-      shell: true,
+      shell: s.shell || true, // a suite can name its shell, e.g. "bash" for .sh scripts on Windows
       stdio: ['inherit', 'pipe', 'pipe'],
       env: { ...process.env, TESTMONITOR: '1', TESTMONITOR_RUN: run, TESTMONITOR_URL: url, TESTMONITOR_SUITE: suite, FORCE_COLOR: process.env.FORCE_COLOR || (process.stdout.isTTY ? '1' : '') },
     });
