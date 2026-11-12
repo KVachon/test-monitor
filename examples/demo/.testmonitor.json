@@ -1,0 +1,7 @@
+{
+  "project": "demo",
+  "suites": [
+    { "name": "unit", "label": "unit tests", "command": "node fake-suite.js markers", "reader": "marker" },
+    { "name": "browser", "label": "browser tests", "command": "node fake-suite.js tap", "reader": "tap" }
+  ]
+}
