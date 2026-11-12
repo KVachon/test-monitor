@@ -19,7 +19,11 @@ const things = ['the empty state', 'a long name', 'a bad token', 'the next page'
 
 if (mode === 'markers') {
   const tests = [];
+  // Real suites don't run at one pace: some features are quick unit checks, others hit the database or
+  // render pages, and each group pays a setup cost first. So each group gets its own speed.
+  const pace = {};
   features.forEach((name, f) => {
+    pace[`F${f + 1}`] = [0.2, 0.5, 1, 2.2, 0.35, 3, 0.8, 1.6, 0.25, 2.6, 0.6, 1.2][f];
     const n = 6 + Math.floor(rnd() * 40);
     for (let i = 0; i < n; i++) tests.push({ id: `f${f + 1}-${i + 1}-${words[i % 10]}-${things[(i * 3 + f) % 10]}`.replace(/\s+/g, '-'), group: `F${f + 1}`, groupName: name, desc: `${words[i % 10][0].toUpperCase() + words[i % 10].slice(1)} ${things[(i * 3 + f) % 10]}` });
   });
@@ -30,7 +34,7 @@ if (mode === 'markers') {
       const t = tests[i];
       say({ type: 'test-start', id: t.id, group: t.group });
       process.stdout.write(`… ${t.id}`);
-      const ms = 150 + rnd() * rnd() * 1800;
+      const ms = (150 + rnd() * rnd() * 1800) * pace[t.group] + (i === 0 || tests[i - 1].group !== t.group ? 2500 + rnd() * 3000 : 0);
       await sleep(ms);
       const status = fails[i] ? 'fail' : i === 140 ? 'flaky' : i === 60 ? 'skip' : 'pass';
       process.stdout.write(`\r${status === 'fail' ? 'FAIL' : status.padEnd(4)}  ${t.id}\n`);
@@ -47,7 +51,7 @@ if (mode === 'markers') {
       console.log(`# Subtest: ${f}`);
       const k = 3 + Math.floor(rnd() * 8);
       for (let i = 0; i < k; i++) {
-        await sleep(1500 + rnd() * 5000);
+        await sleep((1500 + rnd() * 5000) * [0.5, 1.4, 2.5, 0.8, 1.2][files.indexOf(f)]);
         const fail = f === 'checkout' && i === 2;
         bad += fail;
         console.log(`    ${fail ? 'not ok' : 'ok'} ${i + 1} - ${words[(i + n) % 10]} ${things[(i * 7 + n) % 10]}`);

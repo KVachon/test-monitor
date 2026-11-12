@@ -102,11 +102,12 @@ function runSuite(s) {
     try { reader = createReader(s.reader, s); }
     catch (e) { console.error(`testwatch: ${e.message}`); return resolve({ code: 2, failed: 0 }); }
     send({ type: 'suite-start', suite, label: s.label, command: s.command });
-    let failed = 0;
+    let failed = 0, seen = 0;
     const emit = ev => {
       if (!ev || typeof ev !== 'object') return;
       if (ev.type === 'run-start' || ev.type === 'run-end') return; // the run belongs to testwatch
       const out = { suite, ...ev, run };
+      if (out.type === 'test-end') seen++;
       if (out.type === 'test-end' && out.status === 'fail') failed++;
       send(out);
     };
@@ -152,6 +153,8 @@ function runSuite(s) {
       child = null;
       reader.end().forEach(emit);
       send({ type: 'suite-end', suite });
+      if (!seen) process.stderr.write(`testwatch: no tests could be read from "${s.command}", so the monitor only shows that it ran. ` +
+        'Give it TAP output, the Playwright reporter or regex rules in .testmonitor.json (see docs/convention.md in the test-monitor repo).\n');
       resolve({ code: code === null ? 1 : code, failed });
     });
   });
