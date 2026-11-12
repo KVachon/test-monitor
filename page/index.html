@@ -272,7 +272,7 @@ const snow=()=>Date.now()+offset;
 let suites=[],sby={},groups=[],gby={},tby={},total=0,cur=null,shown=null,pinned=null,lastSuite=null;
 let pass=0,fail=0,skip=0,clock=0,doneMs=0,doneN=0,skel={},expectMs=0;
 // chart state
-let bars=[],suiteAt=[],SLOTS=1,CEIL=2000,slowest=null,hover=null,finished=false;
+let bars=[],suiteAt=[],SLOTS=1,CEIL=5000,FLOOR=5,slowest=null,hover=null,finished=false;
 
 function resetModel(){
   suites=[];sby={};groups=[];gby={};tby={};total=0;cur=null;shown=null;pinned=null;lastSuite=null;
@@ -280,8 +280,11 @@ function resetModel(){
   bars=[];suiteAt=[];slowest=null;hover=null;
   const prev=R&&R.previous;
   skel={};(prev?.suites||[]).forEach(s=>skel[s.suite]=s);
-  // The height scale comes from the last run's slowest test and stays put; a slower test is drawn clipped.
-  const prevMax=Math.max(0,...(prev?.suites||[]).flatMap(s=>s.tests.map(t=>t.ms||0)));CEIL=prevMax>=50?prevMax*1.15:2000;
+  // The height scale (log, so quick unit tests and slow browser tests both read) comes from the last run's
+  // quickest and slowest tests and stays put. A slower test changes it once, in one step (see finish).
+  const prevMs=(prev?.suites||[]).flatMap(s=>s.tests.map(t=>t.ms)).filter(v=>v>0).sort((a,b)=>a-b);
+  if(prevMs.length>=5){CEIL=Math.max(50,prevMs.at(-1)*1.3);FLOOR=Math.max(1,Math.min(prevMs[Math.floor(prevMs.length*.05)]*.5,CEIL/20))}
+  else{CEIL=5000;FLOOR=5}
   expectMs=prev?.durationMs||0;
   $('suites').innerHTML='';$('fails').innerHTML='';$('axis').innerHTML='';$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
@@ -376,7 +379,9 @@ function begin(it){const o=it.g,s=o.suite;cur=it;it.st='r';it.at=clock;
 function finish(it,ev){const o=it.g,s=o.suite;o.done++;
   // Without a reported time, a test took from when it started (or the suite's last test ended) until now.
   const from=Math.min(it.at??clock,s.lastEnd??clock),ms=ev.ms??Math.max(0,clock-from);s.lastEnd=clock;
-  o.ms+=ms;doneMs+=ms;doneN++;it.ms=ms;bars.push(it);if(!slowest||ms>slowest.ms)slowest=it;
+  o.ms+=ms;doneMs+=ms;doneN++;it.ms=ms;bars.push(it);
+  // Slower than the scale allows: the scale changes once, with room to spare, rather than creeping.
+  if(ms>CEIL)CEIL=ms*1.6;if(!slowest||ms>slowest.ms)slowest=it;
   if(ev.status==='fail'){fail++;o.bad++;it.st='f';addFail(it,ev.reason||'failed');
     const m=document.createElement('b');m.style.left=`${it.i/o.items.length*100}%`;o.meter.appendChild(m)}
   else if(ev.status==='skip'){skip++;it.st='s'}
@@ -408,30 +413,36 @@ function timeLeft(){if(!total||finished)return null;const avg=doneN?doneMs/doneN
 function draw(){const svg=$('svg'),W=svg.clientWidth||1000,H=svg.clientHeight||112,top=14,bot=H-3;svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   // More tests than slots (no plan, or the suite grew): make room once, with headroom so it rarely happens twice.
   if(bars.length+(cur?1:0)>SLOTS)SLOTS=Math.ceil(Math.max(total,bars.length+1)*1.15);
-  const bw=W/SLOTS,gap=bw>=4?1:bw>=2.5?.5:0,y=ms=>bot-Math.sqrt(Math.min(ms,CEIL)/CEIL)*(bot-top);
-  let s=`<defs><linearGradient id="bp" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity=".18"/></linearGradient>
-    <linearGradient id="bf" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#ff5f57" stop-opacity="1"/><stop offset="1" stop-color="#ff5f57" stop-opacity=".35"/></linearGradient></defs>`;
+  const GUT=44,PW=W-GUT,bw=PW/SLOTS,gap=bw>=4?1:bw>=2.5?.5:0,y=ms=>bot-Math.max(.025,Math.log(Math.min(Math.max(ms,FLOOR),CEIL)/FLOOR)/Math.log(CEIL/FLOOR))*(bot-top);
+  let s=`<defs><linearGradient id="bp" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#fff" stop-opacity=".82"/><stop offset="1" stop-color="#fff" stop-opacity=".22"/></linearGradient>
+    <linearGradient id="bf" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#ff5f57" stop-opacity="1"/><stop offset="1" stop-color="#ff5f57" stop-opacity=".35"/></linearGradient>
+    <linearGradient id="fc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5f57" stop-opacity=".28"/><stop offset="1" stop-color="#ff5f57" stop-opacity=".04"/></linearGradient></defs>`;
   // Guide lines at round durations, labelled on the right.
-  const guides=[100,250,500,1000,2000,5000,10000,30000,60000].filter(v=>v<CEIL*.92&&y(v)>top+10&&y(v)<bot-12);
-  guides.filter((v,i,a)=>i===0||y(a[i-1])-y(v)>16).forEach(v=>{const gy=Math.round(y(v))+.5;
-    s+=`<line x1="0" x2="${W}" y1="${gy}" y2="${gy}" stroke="#fff" stroke-opacity=".05"/><text x="${W-6}" y="${gy-3}" text-anchor="end" font-size="9.5" font-family="var(--mono)" fill="#fff" fill-opacity=".45" stroke="#18181b" stroke-width="3" paint-order="stroke">${fmtMs(v)}</text>`});
+  const guides=[5,10,25,50,100,250,500,1000,2000,5000,10000,30000,60000].filter(v=>v>FLOOR*1.5).filter(v=>v<CEIL*.92&&y(v)>top+10&&y(v)<bot-12);
+  // Keep a guide only if it's well clear of the last one kept, preferring round decades.
+  let lastY=1e9;const keep=[];[...guides].sort((a,b)=>(/^10*$/.test(b)-/^10*$/.test(a))||a-b).forEach(v=>{if(keep.every(k=>Math.abs(y(k)-y(v))>22))keep.push(v)});
+  keep.forEach(v=>{const gy=Math.round(y(v))+.5;
+    s+=`<line x1="0" x2="${PW}" y1="${gy}" y2="${gy}" stroke="#fff" stroke-opacity=".05"/><text x="${W-8}" y="${gy-3}" text-anchor="end" font-size="9.5" font-family="var(--mono)" fill="#fff" fill-opacity=".45" stroke="#18181b" stroke-width="3" paint-order="stroke">${fmtMs(v)}</text>`});
   suiteAt.forEach(([n])=>{const sx=Math.round(n*bw)+.5;s+=`<line x1="${sx}" x2="${sx}" y1="0" y2="${H}" stroke="#fff" stroke-opacity=".18" stroke-dasharray="2 3"/>`});
+  const rx=bw-gap>=3?1:0;
   const bar=(i,ms,fill,op)=>{const bx=i*bw,by=Math.min(y(ms),bot-1.5);
-    return `<rect x="${(bx+gap/2).toFixed(2)}" y="${by.toFixed(1)}" width="${Math.max(.6,bw-gap).toFixed(2)}" height="${(bot-by).toFixed(1)}" fill="${fill}"${op?` fill-opacity="${op}"`:''}/>`};
+    return `<rect x="${(bx+gap/2).toFixed(2)}" y="${by.toFixed(1)}" width="${Math.max(.6,bw-gap).toFixed(2)}" height="${(bot-by+rx).toFixed(1)}" rx="${rx}" fill="${fill}"${op?` fill-opacity="${op}"`:''}/>`};
+  // A failure tints its whole column, so it shows however quick the test was.
+  bars.forEach((it,i)=>{if(it.st==='f')s+=`<rect x="${(i*bw).toFixed(2)}" y="0" width="${Math.max(2,bw).toFixed(2)}" height="${H}" fill="url(#fc)"/>`});
   bars.forEach((it,i)=>{const hv=hover===i;
     if(it.st==='s')s+=bar(i,0,'#fff',hv?.6:.2);
     else s+=bar(i,it.ms,it.st==='f'?'url(#bf)':it.st==='y'?'var(--flaky)':'url(#bp)',hv?1:it.st==='y'?.8:0);
     if(it.ms>CEIL&&it.st!=='s')s+=`<rect x="${(i*bw+gap/2).toFixed(2)}" y="${top-3}" width="${Math.max(.6,bw-gap).toFixed(2)}" height="2" fill="${it.st==='f'?'#ff5f57':'#fff'}"/>`;
-    if(it.st==='f'){const cx=(i+.5)*bw;s+=`<circle cx="${cx.toFixed(1)}" cy="6" r="2.4" fill="#ff5f57"/>`}});
+    if(it.st==='f'){const cx=(i+.5)*bw;s+=`<circle cx="${cx.toFixed(1)}" cy="6" r="4.5" fill="#ff5f57" fill-opacity=".2"/><circle cx="${cx.toFixed(1)}" cy="6" r="2.2" fill="#ff5f57"/>`}});
   const pip=$('pip');pip.hidden=true;
   if(cur&&!finished&&cur.at!=null){const i=bars.length,ms=clock-Math.min(cur.at,cur.g.suite.lastEnd??cur.at);
     s+=bar(i,ms,'#fff',.9);pip.hidden=false;pip.style.transform=`translate(${((i+.5)*bw).toFixed(1)}px,${Math.min(y(ms),bot-1.5).toFixed(1)}px)`}
-  $('axis').innerHTML=suiteAt.map(([n,label])=>`<span style="left:${(n/SLOTS*100).toFixed(2)}%">${esc(label)}</span>`).join('');
+  $('axis').innerHTML=suiteAt.map(([n,label])=>`<span style="left:${(n*bw/W*100).toFixed(2)}%">${esc(label)}</span>`).join('');
   svg.innerHTML=s}
 function rateHtml(){const it=hover!=null?bars[hover]:null;
   if(it)return `<small>${esc(it.g.name&&it.g.name!==it.g.key?it.id:it.g.key+' · '+(it.d||it.id))}</small> ${fmtMs(it.ms)}`;
   return slowest?`<small>slowest</small> ${fmtMs(slowest.ms)}`:''}
-$('svg').addEventListener('mousemove',e=>{const r=e.currentTarget.getBoundingClientRect(),i=Math.floor((e.clientX-r.left)/r.width*SLOTS);
+$('svg').addEventListener('mousemove',e=>{const r=e.currentTarget.getBoundingClientRect(),i=Math.floor((e.clientX-r.left)/(r.width-44)*SLOTS);
   const h=i>=0&&i<bars.length?i:null;if(h!==hover){hover=h;draw();$('rate').innerHTML=rateHtml()}});
 $('svg').addEventListener('mouseleave',()=>{hover=null;draw();$('rate').innerHTML=rateHtml()});
 addEventListener('resize',()=>draw());
