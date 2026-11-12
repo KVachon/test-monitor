@@ -68,8 +68,11 @@ main{padding-block:28px 40px}
 .rate small{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:2px}
 
 /* pace */
-.trace{position:relative;height:112px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0) 70%),var(--well);border:1px solid var(--hair);overflow:hidden}
-.trace svg{display:block;width:100%;height:100%}
+.trace{position:relative;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0) 70%),var(--well);border:1px solid var(--hair);overflow:hidden}
+.trace svg{display:block;width:100%;height:auto;overflow:visible}
+.trace .pip{left:14px;top:12px}
+.legend{display:inline-flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--ink-3);white-space:nowrap}
+.legend i{display:block;width:10px;height:10px;border-radius:2px;background:#fff}
 .pip{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
 .pip::before,.pip::after{content:"";position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--run)}
 .pip::before{animation:ring 1.6s ease-out infinite}
@@ -227,8 +230,8 @@ main{padding-block:28px 40px}
 
   <section>
     <div class="hd"><h2>How long each test took</h2><span class="rate num" id="rate">0</span></div>
-    <div class="chart"><div class="trace"><svg id="svg" viewBox="0 0 1000 112" role="img" aria-label="One bar per test, in run order and grouped by feature; its height is how long the test took. Faint bars are last run's times for tests still to come. Failures are red."></svg><span class="pip" id="pip" hidden></span></div>
-    <div class="axis" id="axis" aria-hidden="true"></div><div class="tip" id="tip" hidden></div></div>
+    <div class="chart"><div class="trace"><svg id="svg" viewBox="0 0 1000 100" role="img" aria-label="Every test as a square, one row per feature; the brighter the square, the longer the test took. Failed tests are red, flaky amber, tests not run yet are empty."></svg><span class="pip" id="pip" hidden></span></div>
+    <div class="tip" id="tip" hidden></div></div>
     <div class="now" aria-live="polite"><span class="k" id="nk"></span><span class="id" id="ni"></span><span class="d" id="nd"></span><span class="eta num" id="etaw"><b id="nl">0</b> to go<span id="eta"></span></span></div>
   </section>
 
@@ -295,7 +298,7 @@ function resetModel(){
   if(prevMs.length>=5){CEIL=Math.max(50,prevMs.at(-1)*2);FLOOR=Math.max(1,Math.min(prevMs[Math.floor(prevMs.length*.05)]*.5,CEIL/20))}
   else{CEIL=5000;FLOOR=5}
   expectMs=prev?.durationMs||0;
-  $('suites').innerHTML='';$('fails').innerHTML='';$('axis').innerHTML='';$('none').hidden=false;$('fc').textContent='';
+  $('suites').innerHTML='';$('fails').innerHTML='';$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
   $('nk').textContent='';$('ni').textContent='';$('nd').textContent='';
   $('dot').className='orb'+(R?' run':'');$('h').textContent=R?'Running tests':'Waiting for a test run';
@@ -419,69 +422,54 @@ function timeLeft(){if(!total||finished)return null;const avg=doneN?doneMs/doneN
   groups.forEach(o=>o.items.forEach(it=>{if(it.done)return;const ms=it.prevMs??avg;if(ms==null){unknown++;return}left+=ms}));
   if(unknown)return null;if(cur&&cur.at!=null)left=Math.max(0,left-(clock-cur.at));return left}
 const GUT=44;
-function geom(){const svg=$('svg'),W=svg.clientWidth||1000,H=svg.clientHeight||112;
-  // More tests than slots (no plan, or the run grew): make room once, with headroom so it rarely happens twice.
-  if(slots.length>SLOTS)SLOTS=Math.ceil(slots.length*1.15);
-  const PW=W-GUT,bw=PW/SLOTS,top=16,bot=H-4;
-  return {svg,W,H,PW,bw,top,bot,gap:bw>=6?2:bw>=3?1:bw>=2?.5:0,
-    y:ms=>bot-Math.max(.03,Math.log(Math.min(Math.max(ms,FLOOR),CEIL)/FLOOR)/Math.log(CEIL/FLOOR))*(bot-top)}}
+// Every test is a square in its feature's row, in run order, so the whole run is one picture that fills in.
+// Brightness is how long the test took, on a log scale fixed from the last run (it changes once, in one step,
+// only if a test is slower than that allows). Squares never move: rows and positions come from the plan or the
+// last run, and a new test is added at the end of its row.
+let cellsAt=[];
+const shade=ms=>{const v=Math.min(1,Math.max(0,Math.log(Math.max(ms,FLOOR)/FLOOR)/Math.log(CEIL/FLOOR)));return .1+.85*v};
+function layout(){const svg=$('svg'),W=svg.clientWidth||1000,narrow=W<520,LW=narrow?76:132;
+  const maxN=Math.max(8,...groups.map(o=>o.items.length));
+  // Squares stay big enough to see and hover; a long feature wraps onto more lines rather than shrinking them.
+  const cs=Math.max(narrow?12:10,Math.min(16,Math.floor((W-LW)/maxN))),gap=2,SH=22,per=Math.max(1,Math.floor((W-LW)/cs));
+  const rows=[];let yy=0;
+  suites.forEach((su,k)=>{if(suites.length>1){rows.push({suite:su,y:yy});yy+=SH}
+    su.groups.forEach(o=>{const lines=Math.max(1,Math.ceil(o.items.length/per));rows.push({g:o,y:yy});yy+=lines*cs+(lines>1?3:0)});if(k<suites.length-1)yy+=6});
+  return {svg,W,LW,cs,gap,per,rows,H:Math.max(yy,cs),narrow}}
 function runMs(it){return clock-Math.min(it.at,it.g.suite.lastEnd??it.at)}
-function draw(){const {svg,W,H,PW,bw,top,bot,gap,y}=geom();svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  const f=v=>v.toFixed(1),bwid=Math.max(.6,bw-gap),rx=bwid>=6?2:bwid>=3?1:0;
-  let s='';
-  // Feature bands: each run of slots from one group, alternate ones faintly shaded, keys on the axis below.
-  const bands=[];slots.forEach((it,i)=>{const l=bands.at(-1);if(l&&l.g===it.g)l.n++;else bands.push({g:it.g,i,n:1})});
-  bands.forEach((b,k)=>{if(k%2)s+=`<rect x="${f(b.i*bw)}" y="0" width="${f(b.n*bw)}" height="${H}" fill="#fff" fill-opacity=".022"/>`});
-  // Guides at round durations, labelled in the gutter; a solid baseline.
-  const cand=[1,10,100,1000,10000,60000,5,50,500,5000,30000,2,20,200,2000,20000].filter(v=>v>FLOOR*1.2&&v<CEIL*.95&&y(v)>top+8&&y(v)<bot-10);
-  const keep=[];cand.forEach(v=>{if(keep.every(k=>Math.abs(y(k)-y(v))>24))keep.push(v)});
-  keep.forEach(v=>{const gy=Math.round(y(v))+.5;
-    s+=`<line x1="0" x2="${PW}" y1="${gy}" y2="${gy}" stroke="#fff" stroke-opacity=".05"/><text x="${W-8}" y="${gy+3.5}" text-anchor="end" font-size="10" font-family="IBM Plex Mono,ui-monospace,monospace" fill="#7b7b83">${fmtMs(v)}</text>`});
-  s+=`<line x1="0" x2="${PW}" y1="${bot+.5}" y2="${bot+.5}" stroke="#fff" stroke-opacity=".12"/>`;
-  // Suite boundaries: a solid hairline.
-  const sb=[];bands.forEach((b,k)=>{if(k&&b.g.suite!==bands[k-1].g.suite)sb.push(b)});
-  sb.forEach(b=>{const sx=Math.round(b.i*bw)+.5;s+=`<line x1="${sx}" x2="${sx}" y1="0" y2="${bot}" stroke="#fff" stroke-opacity=".14"/>`});
-  const rect=(i,ms,fill,op)=>{const by=Math.min(y(ms),bot-2);
-    return `<rect x="${f(i*bw+gap/2)}" y="${f(by)}" width="${bwid.toFixed(2)}" height="${f(bot-by+rx)}" rx="${rx}" fill="${fill}" fill-opacity="${op}"/>`};
-  const hv=hover!=null?slots[hover]:null;
-  if(hv)s+=`<rect x="${f(hv.slot*bw)}" y="0" width="${f(Math.max(bw,1))}" height="${bot}" fill="#fff" fill-opacity=".05"/>`;
-  slots.forEach((it,i)=>{const on=hv===it;
-    if(it.done){
-      if(it.st==='s')s+=rect(i,FLOOR,'#fff',on?.6:.22);
-      else if(it.st==='f')s+=rect(i,it.ms,'#ff5f57',1);
-      else if(it.st==='y')s+=rect(i,it.ms,'#f0b545',on?1:.85);
-      else s+=rect(i,it.ms,'#fff',on||it===slowest?.92:.5);
-    }else if(it!==cur&&it.prevMs!=null&&!finished)s+=rect(i,it.prevMs,'#fff',on?.16:.07)});
-  // A failure also gets a marker on the top row, so even a quick one is easy to find.
-  slots.forEach((it,i)=>{if(it.st==='f')s+=`<circle cx="${f((i+.5)*bw)}" cy="7" r="2.75" fill="#ff5f57" stroke="#18181b" stroke-width="2"/>`});
-  // The slowest test so far is labelled at its bar.
-  if(slowest&&doneN>=10){const i=slowest.slot,tx=Math.min(Math.max((i+.5)*bw,18),PW-18),ty=y(slowest.ms)-5;
-    if(ty>top-2)s+=`<text x="${f(tx)}" y="${f(ty)}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono,ui-monospace,monospace" fill="#b4b4ba" stroke="#18181b" stroke-width="3" paint-order="stroke">${fmtMs(slowest.ms)}</text>`}
-  const pip=$('pip');pip.hidden=true;
-  if(cur&&!finished&&cur.at!=null){const ms=runMs(cur);s+=rect(cur.slot,ms,'#fff',.95);
-    pip.hidden=false;pip.style.transform=`translate(${f((cur.slot+.5)*bw)}px,${f(Math.min(y(ms),bot-2))}px)`}
+function draw(){const {svg,W,LW,cs,gap,per,rows,H,narrow}=layout();svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('height',H);
+  const c=cs-gap,rx=c>=10?2.5:c>=6?1.5:1,hv=hover;let s='';cellsAt=[];
+  rows.forEach(r=>{
+    if(r.suite){s+=`<text x="0" y="${r.y+13}" font-size="10.5" font-family="IBM Plex Mono,ui-monospace,monospace" fill="#7b7b83">${esc(r.suite.label)}</text>`;return}
+    const o=r.g,keyed=o.name&&o.name!==o.key,ty=r.y+c/2+3.5;
+    const fit=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
+    s+=`<text x="0" y="${ty}" font-size="11" font-family="IBM Plex Mono,ui-monospace,monospace" fill="${o.bad?'#ff5f57':'#b4b4ba'}">${esc(fit(o.key,Math.floor((LW-8)/6.7)))}</text>`;
+    if(keyed&&!narrow)s+=`<text x="${o.key.length*6.8+8}" y="${ty}" font-size="11.5" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(o.name.length>13?o.name.slice(0,12)+'…':o.name)}</text>`;
+    o.items.forEach((it,i)=>{const x=LW+(i%per)*cs,y=r.y+Math.floor(i/per)*cs;cellsAt.push([x,y,it]);let fill='#fff',op=.045,extra='';
+      if(it.done){if(it.st==='f'){fill='#ff5f57';op=1}else if(it.st==='y'){fill='#f0b545';op=.9}else if(it.st==='s'){op=0;extra=` stroke="#fff" stroke-opacity=".28" stroke-width="1"`}else op=shade(it.ms)}
+      else if(it===cur&&!finished){op=Math.max(.25,shade(runMs(it)))}
+      if(it===hv)extra+=` stroke="#fff" stroke-width="1.5"`;
+      const inset=it.st==='s'&&it.done?.5:0;
+      s+=`<rect x="${x+inset}" y="${y+inset}" width="${c-2*inset}" height="${c-2*inset}" rx="${rx}" fill="${fill}" fill-opacity="${op}"${extra}/>`})});
   svg.innerHTML=s;
-  // Axis: suite names at their boundaries, feature keys centred under their bands where they fit.
-  const lab=[];let busy=-1;
-  bands.forEach((b,k)=>{const x0=b.i*bw,cx=x0+b.n*bw/2;
-    if(sb.includes(b)){const w=b.g.suite.label.length*6.4+10;lab.push(`<span class="su" style="${x0+w>W?'right:0':`left:${(x0/W*100).toFixed(2)}%`}">${esc(b.g.suite.label)}</span>`);busy=x0+w;return}
-    const w=b.g.key.length*6.4+8;if(w<=b.n*bw-2&&cx-w/2>busy){lab.push(`<span style="left:${(cx/W*100).toFixed(2)}%">${esc(b.g.key)}</span>`);busy=cx+w/2}});
-  $('axis').innerHTML=lab.join('');
+  const pip=$('pip');pip.hidden=true;
+  if(cur&&!finished&&cur.at!=null){const at=cellsAt.find(a=>a[2]===cur);if(at){pip.hidden=false;pip.style.transform=`translate(${at[0]+c/2}px,${at[1]+c/2}px)`}}
   tip()}
-// Hover: the slot under the pointer, with a card for its test.
-function tip(){const t=$('tip'),it=hover!=null?slots[hover]:null;if(!it){t.hidden=true;return}
-  const {bw,PW}=geom(),keyed=it.g.name&&it.g.name!==it.g.key;
-  const st=it.st==='f'?'<small class="f">failed</small>':it.st==='y'?'<small class="y">flaky</small>':it.st==='s'?'<small>skipped</small>':'';
+function tip(){const t=$('tip'),it=hover;if(!it){t.hidden=true;return}
+  const at=cellsAt.find(a=>a[2]===it);if(!at){t.hidden=true;return}
+  const {W,cs}=layout(),keyed=it.g.name&&it.g.name!==it.g.key;
+  const st=it.st==='f'?'<small class="f">failed</small>':it.st==='y'?'<small class="y">flaky</small>':'';
   const val=it.done?(it.st==='s'?'Skipped':fmtMs(it.ms)):it===cur?fmtMs(runMs(it)):'Not run yet';
   const prev=it.prevMs!=null?`Last run ${fmtMs(it.prevMs)}`:'';
   t.innerHTML=`<b>${val}${it.done&&it.st!=='s'?st:it===cur?'<small>running</small>':''}</b><span class="i"></span><span class="d"></span>${prev?`<span class="p">${prev}</span>`:''}`;
   t.querySelector('.i').textContent=keyed?it.id:`${it.g.key}`;t.querySelector('.d').textContent=it.d||(keyed?'':it.id);
-  t.hidden=false;const cx=(it.slot+.5)*bw,tw=t.offsetWidth;
-  // Beside the bar, inside the chart, on whichever side has room.
-  t.style.left=(cx+12+tw<=PW?cx+12:Math.max(0,cx-12-tw))+'px';t.style.top='8px'}
-function rateHtml(){return slowest?`<small>slowest</small> ${fmtMs(slowest.ms)}`:''}
-$('svg').addEventListener('pointermove',e=>{const r=e.currentTarget.getBoundingClientRect(),{bw}=geom(),i=Math.floor((e.clientX-r.left)/bw);
-  const h=i>=0&&i<slots.length?i:null;if(h!==hover){hover=h;draw()}});
+  t.hidden=false;const tw=t.offsetWidth,th=t.offsetHeight,x=at[0]+14,y=at[1]+12;
+  t.style.left=(x+cs+10+tw<=W+28?x+cs+10:Math.max(0,x-10-tw))+'px';t.style.top=Math.max(0,y+cs/2-th/2)+'px'}
+// The header shows the scale: from quick to slow, with the times at each end.
+function rateHtml(){const sw=[.1,.31,.53,.74,.95].map(o=>`<i style="opacity:${o}"></i>`).join('');
+  return `<span class="legend">${fmtMs(FLOOR)} ${sw} ${fmtMs(CEIL)}</span>`}
+$('svg').addEventListener('pointermove',e=>{const r=e.currentTarget.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{cs}=layout();
+  const a=cellsAt.find(([x,y])=>px>=x-1&&px<x+cs&&py>=y-1&&py<y+cs);const h=a?a[2]:null;if(h!==hover){hover=h;draw()}});
 $('svg').addEventListener('pointerleave',()=>{hover=null;draw()});
 addEventListener('resize',()=>draw());
 
