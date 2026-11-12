@@ -5,6 +5,7 @@ A live page for test runs, from any project on any machine. Every run reports to
 Node 18 or later, no dependencies. Works on macOS and Windows.
 
 - [docs/convention.md](docs/convention.md): the one structure every test suite follows, and the event format.
+- [docs/setup-mac-mini.md](docs/setup-mac-mini.md): running it on the mini, with the tunnel and token.
 - [docs/brief.md](docs/brief.md): the starting brief.
 - [design/mockup-template.html](design/mockup-template.html): the agreed design the page is built from.
 
