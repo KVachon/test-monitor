@@ -203,6 +203,9 @@ main{padding-block:28px 40px}
 .hrow .ct{font-size:12.5px;color:var(--ink-2);white-space:nowrap;text-align:right;min-width:150px}
 .hrow .ct b{font-weight:600;color:var(--ink)} .hrow .ct .bad,.hrow .ct .bad b{color:var(--fail)}
 .hempty{margin:0;color:var(--ink-3);font-size:13px}
+.trend[hidden]{display:none}
+.trend svg{display:block;width:100%;height:auto;overflow:visible;cursor:pointer}
+.trend .legend i.f{background:var(--fail)} .trend .legend i.y{background:var(--flaky)}
 .more{justify-self:start}
 .more[hidden],.hempty[hidden],#livebtn[hidden]{display:none}
 @media (max-width:640px){
@@ -256,6 +259,10 @@ main{padding-block:28px 40px}
     </div>
   </footer>
 </div>
+  <section class="col panel hist trend" id="trend" aria-label="Recent runs by feature" hidden>
+    <div class="hd"><h2 id="trh">Recent runs</h2><span class="legend" id="trl"></span></div>
+    <div class="chart"><svg id="tsvg" role="img" aria-label="One row per feature, one column per recent run, oldest on the left. Red: a test failed. Amber: a test was flaky. Otherwise the brighter the cell, the longer the feature took compared with its usual time."></svg><div class="tip" id="ttip" hidden></div></div>
+  </section>
   <section class="col panel hist" aria-label="Past runs">
     <div class="hd"><h2>Runs</h2><div class="hctl"><button class="btn" id="livebtn" hidden>Back to live</button><div class="seg" id="pf" role="group" aria-label="Project"></div></div></div>
     <div class="runs" id="runs"></div>
@@ -546,8 +553,62 @@ async function loadRuns(){
         <span class="du num">${m.ended?secs(m.durationMs):''}</span><span class="ct num">${counts}</span></button>`}).join('');
     $('runs').querySelectorAll('.hrow').forEach(b=>b.onclick=()=>openRun(b.dataset.id));
     $('hempty').hidden=d.runs.length>0;$('more').hidden=d.total<=d.runs.length;
+    loadTrend();
   }catch{}}
 const refreshRuns=()=>{clearTimeout(hTimer);hTimer=setTimeout(loadRuns,300)};
+
+// ---------- recent runs by feature ----------
+// One row per feature, one column per finished run (oldest left). A failed test makes the cell red, a flaky one
+// amber; otherwise the cell is brighter the longer the feature took compared with its usual (median) time, so a
+// row that brightens is a feature getting slower. The trend on the right is the feature's time per run.
+let TH=null,tHover=null,tCells=[],tG={cs:16,ch:15,g:3};
+async function loadTrend(){try{const res=await fetch(api('/api/history?limit=30'+(hProject?`&project=${encodeURIComponent(hProject)}`:'')));
+  if(!res.ok)return;TH=await res.json();drawTrend()}catch{}}
+function drawTrend(){const sec=$('trend');if(!TH||TH.runs.length<2||!TH.features.length){sec.hidden=true;return}sec.hidden=false;
+  const svg=$('tsvg'),W=svg.clientWidth||1000,narrow=W<520,LW=narrow?48:140,RW=narrow?0:150,mono='font-family="IBM Plex Mono,ui-monospace,monospace"';
+  const room=W-LW-RW,k=Math.min(TH.runs.length,Math.floor(room/16)),off=TH.runs.length-k,runs=TH.runs.slice(off);
+  const cs=Math.min(36,Math.floor(room/k)),ch=narrow?12:15,RH=narrow?17:21,g=3;
+  $('trh').textContent=`Last ${k} runs${TH.project?' · '+TH.project:''}`;
+  $('trl').innerHTML=`<i class="f"></i> failed <i class="y"></i> flaky <i style="opacity:.25"></i><i style="opacity:.85"></i> quicker → slower than usual`;
+  let s='',y=0;tCells=[];
+  // Header: one dot per run, coloured by how it ended; the run on screen above is marked.
+  runs.forEach((r,c)=>{const cx=LW+c*cs+(cs-g)/2;
+    if(R&&R.id===r.id)s+=`<rect x="${LW+c*cs-2}" y="-2" width="${cs-g+4}" height="@H@" rx="4" fill="#fff" fill-opacity=".07"/>`;
+    s+=`<circle cx="${cx}" cy="6" r="3" fill="${r.status==='pass'?'#5ad46d':r.status==='fail'?'#ff5f57':'#4e4e55'}"/>`});
+  y=18;let lastSuite=null;const multi=new Set(TH.features.map(f=>f.suite)).size>1;
+  TH.features.forEach(f=>{
+    if(multi&&f.suite!==lastSuite){s+=`<text x="0" y="${y+13}" font-size="10.5" ${mono} fill="#7b7b83">${esc(f.label)}</text>`;y+=20}lastSuite=f.suite;
+    const cells=f.cells.slice(off),cy=y+RH/2,keyed=f.name&&f.name!==f.group;
+    const ms=cells.filter(Boolean).map(c=>c.ms).sort((a,b)=>a-b),med=ms[Math.floor(ms.length/2)]||1,timed=ms.at(-1)>0;
+    const bad=cells.at(-1)?.fail.length;
+    s+=`<text x="0" y="${cy+3.5}" font-size="10.5" ${mono} fill="${bad?'#ff5f57':'#b4b4ba'}">${esc(narrow&&f.group.length>6?f.group.slice(0,5)+'…':f.group)}</text>`;
+    if(keyed&&!narrow)s+=`<text x="${f.group.length*6.5+8}" y="${cy+3.5}" font-size="11" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(f.name.length>12?f.name.slice(0,11)+'…':f.name)}</text>`;
+    cells.forEach((c,i)=>{const x=LW+i*cs,run=runs[i];tCells.push([x,cy-ch/2,f,c,run]);const on=tHover&&tHover[2]===f&&tHover[4]===run;
+      let a;if(!c)a=`fill="none" stroke="#fff" stroke-opacity=".08"`;
+      else if(c.fail.length)a=`fill="#ff5f57"`;else if(c.flaky.length)a=`fill="#f0b545" fill-opacity=".9"`;
+      else a=`fill="#fff" fill-opacity="${(timed?Math.min(.92,Math.max(.14,.45*Math.pow(c.ms/med,1.4))):.4).toFixed(2)}"`;
+      s+=`<rect x="${x+(c?0:.5)}" y="${cy-ch/2+(c?0:.5)}" width="${cs-g-(c?0:1)}" height="${ch-(c?0:1)}" rx="2.5" ${a}${on?' stroke="#fff" stroke-width="1.5"':''}/>`});
+    if(RW&&timed){const vals=cells.map(c=>c?c.ms:null),pts=[],sx=LW+k*cs+14,sw=Math.min(RW-70,W-LW-k*cs-80),lo=Math.min(...ms),hi=Math.max(...ms);
+      vals.forEach((v,i)=>{if(v!=null)pts.push([sx+(k>1?i/(k-1):0)*sw,cy+5-(hi>lo?(v-lo)/(hi-lo):.5)*11])});
+      if(pts.length>1)s+=`<polyline points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${pts.at(-1)[0].toFixed(1)}" cy="${pts.at(-1)[1].toFixed(1)}" r="2.5" fill="#fff"/>`;
+      // The latest run against the usual time before it.
+      const last=vals.at(-1),before=vals.slice(0,-1).filter(v=>v!=null).sort((a,b)=>a-b),bm=before[Math.floor(before.length/2)];
+      if(last!=null&&bm){const d=Math.round((last-bm)/bm*100);s+=`<text x="${sx+sw+52}" y="${cy+3.5}" text-anchor="end" font-size="10.5" ${mono} fill="${d>=25?'#f0b545':'#7b7b83'}">${d>0?'+':''}${d}%</text>`}}
+    y+=RH});
+  tG={cs,ch,g};svg.setAttribute('viewBox',`0 -2 ${W} ${y+2}`);svg.setAttribute('height',y+2);svg.innerHTML=s.replace('@H@',y+2);tTip()}
+function tTip(){const t=$('ttip');if(!tHover){t.hidden=true;return}const [x,y,f,c,run]=tHover,W=$('tsvg').clientWidth;
+  const when=`${dayName(run.started)} ${clockTime(run.started)}`;
+  t.innerHTML=`<b></b><span class="i"></span><span class="d"></span><span class="p"></span>`;
+  t.querySelector('b').innerHTML=c?esc(fmtMs(c.ms))+(c.fail.length?`<small class="f">${c.fail.length} failed</small>`:c.flaky.length?`<small class="y">flaky</small>`:''):'Not in this run';
+  t.querySelector('.i').textContent=f.group+(f.name&&f.name!==f.group?' · '+f.name:'');
+  t.querySelector('.d').textContent=c&&(c.fail.length||c.flaky.length)?[...c.fail,...c.flaky].slice(0,3).join(', ')+(c.fail.length+c.flaky.length>3?' …':''):(c?`${c.n} tests`:'');
+  t.querySelector('.p').textContent=`${when} · click to open`;
+  t.hidden=false;const tw=t.offsetWidth;t.style.left=(x+30+tw<=W?x+30:Math.max(0,x-12-tw))+'px';t.style.top=Math.max(0,y-t.offsetHeight/2+8)+'px'}
+const tAt=e=>{const r=$('tsvg').getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;return tCells.find(([x,y])=>px>=x-1&&px<x+tG.cs&&py>=y-3&&py<y+tG.ch+3)||null};
+$('tsvg').addEventListener('pointermove',e=>{const h=tAt(e);if(h?.[2]!==tHover?.[2]||h?.[4]!==tHover?.[4]){tHover=h;drawTrend()}});
+$('tsvg').addEventListener('pointerleave',()=>{tHover=null;drawTrend()});
+$('tsvg').addEventListener('click',e=>{const h=tAt(e);if(h)openRun(h[4].id)});
+addEventListener('resize',()=>drawTrend());
 $('more').onclick=()=>{hLimit+=40;loadRuns()};
 function setUrl(id){const u=new URLSearchParams(location.search);if(id)u.set('run',id);else u.delete('run');
   history.pushState({run:id},'',location.pathname+(u.toString()?'?'+u:''))}
