@@ -7,6 +7,7 @@
 //   testwatch -- npm test          run any command (TAP and @@testmonitor lines are read automatically)
 //
 //   testwatch --claude-hook        the Claude Code hook (see lib/hook.js)
+//   testwatch --install-claude [--url URL]   set this machine up: hook, CLAUDE.md rule, monitor address, token
 //
 // Options: --project NAME  --label TEXT  --reader auto|tap|pattern|marker  --url URL
 // Environment: TESTMONITOR_URL (default http://localhost:7357), TESTMONITOR_TOKEN (or ~/.test-monitor/token).
@@ -28,6 +29,12 @@ function usage(code) {
 // ---- arguments ----
 const argv = process.argv.slice(2);
 if (argv[0] === '--claude-hook') { require('../lib/hook').runHook(); return; }
+if (argv[0] === '--install-claude') {
+  const i = argv.indexOf('--url');
+  try { require('../lib/install').install({ url: i > 0 ? argv[i + 1] : undefined }); }
+  catch (e) { console.error('testwatch: ' + e.message); process.exit(1); }
+  return;
+}
 const dash = argv.indexOf('--');
 const own = dash >= 0 ? argv.slice(0, dash) : argv;
 const adhoc = dash >= 0 ? argv.slice(dash + 1) : null;
@@ -71,7 +78,11 @@ if (adhoc) {
 }
 
 const project = opt.project || config.project || path.basename(root);
-const url = opt.url || process.env.TESTMONITOR_URL || config.url || 'http://localhost:7357';
+// Where runs go: --url, then TESTMONITOR_URL, then the project's .testmonitor.json, then this machine's
+// ~/.test-monitor/config.json (written by --install-claude), then the monitor on this machine.
+let machine = {};
+try { machine = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.test-monitor', 'config.json'), 'utf8')); } catch {}
+const url = opt.url || process.env.TESTMONITOR_URL || config.url || machine.url || 'http://localhost:7357';
 let token = process.env.TESTMONITOR_TOKEN || '';
 if (!token) { try { token = fs.readFileSync(path.join(os.homedir(), '.test-monitor', 'token'), 'utf8').trim(); } catch {} }
 

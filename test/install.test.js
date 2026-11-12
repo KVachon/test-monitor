@@ -1,0 +1,37 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { install, RULE_HEADING } = require('../lib/install');
+
+test.describe('install', () => {
+  test('adds the hook, rule, address and token once, keeping what was there', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-home-'));
+    try {
+      fs.mkdirSync(path.join(home, '.claude'));
+      fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify({ model: 'x', hooks: { PreToolUse: [{ matcher: 'Edit', hooks: [] }] } }));
+      fs.writeFileSync(path.join(home, '.claude', 'CLAUDE.md'), '# My rules\n');
+      for (let i = 0; i < 2; i++) install({ home, url: 'https://tests.example', token: 'abc', log: () => {} });
+      const s = JSON.parse(fs.readFileSync(path.join(home, '.claude', 'settings.json'), 'utf8'));
+      assert.strictEqual(s.model, 'x');
+      assert.strictEqual(s.hooks.PreToolUse.length, 2);
+      assert.strictEqual(s.hooks.PreToolUse[1].hooks[0].command, 'testwatch --claude-hook');
+      const md = fs.readFileSync(path.join(home, '.claude', 'CLAUDE.md'), 'utf8');
+      assert.ok(md.startsWith('# My rules\n'));
+      assert.strictEqual(md.split(RULE_HEADING).length, 2);
+      assert.strictEqual(JSON.parse(fs.readFileSync(path.join(home, '.test-monitor', 'config.json'), 'utf8')).url, 'https://tests.example');
+      assert.strictEqual(fs.readFileSync(path.join(home, '.test-monitor', 'token'), 'utf8').trim(), 'abc');
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  });
+
+  test('works on a machine with no Claude settings yet', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-home-'));
+    try {
+      install({ home, token: '', log: () => {} });
+      assert.ok(fs.existsSync(path.join(home, '.claude', 'settings.json')));
+      assert.ok(fs.readFileSync(path.join(home, '.claude', 'CLAUDE.md'), 'utf8').includes(RULE_HEADING));
+    } finally { fs.rmSync(home, { recursive: true, force: true }); }
+  });
+});
