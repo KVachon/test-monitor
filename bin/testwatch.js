@@ -7,6 +7,7 @@
 //   testwatch -- npm test          run any command (TAP and @@testmonitor lines are read automatically)
 //
 //   testwatch --claude-hook        the Claude Code hook (see lib/hook.js)
+//   testwatch --install-claude [--url URL]   set this machine up: hook, CLAUDE.md rule, monitor address, token
 //
 // Options: --project NAME  --label TEXT  --reader auto|tap|pattern|marker  --url URL
 // Environment: TESTMONITOR_URL (default http://localhost:7357), TESTMONITOR_TOKEN (or ~/.test-monitor/token).
@@ -28,6 +29,12 @@ function usage(code) {
 // ---- arguments ----
 const argv = process.argv.slice(2);
 if (argv[0] === '--claude-hook') { require('../lib/hook').runHook(); return; }
+if (argv[0] === '--install-claude') {
+  const i = argv.indexOf('--url');
+  try { require('../lib/install').install({ url: i > 0 ? argv[i + 1] : undefined }); }
+  catch (e) { console.error('testwatch: ' + e.message); process.exit(1); }
+  return;
+}
 const dash = argv.indexOf('--');
 const own = dash >= 0 ? argv.slice(0, dash) : argv;
 const adhoc = dash >= 0 ? argv.slice(dash + 1) : null;
@@ -61,8 +68,8 @@ const root = configFile ? path.dirname(configFile) : process.cwd();
 let suites;
 if (adhoc) {
   if (!adhoc.length) usage(2);
-  const command = adhoc.map(a => (/[\s"'$`\\]/.test(a) && process.platform !== 'win32' ? `'${a.replace(/'/g, `'\\''`)}'` : a)).join(' ');
-  suites = [{ name: 'tests', label: opt.label || adhoc.join(' '), command, reader: opt.reader || 'auto', cwd: process.cwd() }];
+  const { command, shell } = require('../lib/quote').commandFor(adhoc);
+  suites = [{ name: 'tests', label: opt.label || adhoc.join(' '), command, shell, reader: opt.reader || 'auto', cwd: process.cwd() }];
 } else {
   const all = config.suites || [];
   if (!all.length) { console.error('testwatch: no .testmonitor.json with suites here. Use: testwatch -- <test command>'); process.exit(2); }
@@ -71,7 +78,11 @@ if (adhoc) {
 }
 
 const project = opt.project || config.project || path.basename(root);
-const url = opt.url || process.env.TESTMONITOR_URL || config.url || 'http://localhost:7357';
+// Where runs go: --url, then TESTMONITOR_URL, then the project's .testmonitor.json, then this machine's
+// ~/.test-monitor/config.json (written by --install-claude), then the monitor on this machine.
+let machine = {};
+try { machine = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.test-monitor', 'config.json'), 'utf8')); } catch {}
+const url = opt.url || process.env.TESTMONITOR_URL || config.url || machine.url || 'http://localhost:7357';
 let token = process.env.TESTMONITOR_TOKEN || '';
 if (!token) { try { token = fs.readFileSync(path.join(os.homedir(), '.test-monitor', 'token'), 'utf8').trim(); } catch {} }
 
@@ -102,11 +113,12 @@ function runSuite(s) {
     try { reader = createReader(s.reader, s); }
     catch (e) { console.error(`testwatch: ${e.message}`); return resolve({ code: 2, failed: 0 }); }
     send({ type: 'suite-start', suite, label: s.label, command: s.command });
-    let failed = 0;
+    let failed = 0, seen = 0;
     const emit = ev => {
       if (!ev || typeof ev !== 'object') return;
       if (ev.type === 'run-start' || ev.type === 'run-end') return; // the run belongs to testwatch
       const out = { suite, ...ev, run };
+      if (out.type === 'test-end') seen++;
       if (out.type === 'test-end' && out.status === 'fail') failed++;
       send(out);
     };
@@ -152,6 +164,8 @@ function runSuite(s) {
       child = null;
       reader.end().forEach(emit);
       send({ type: 'suite-end', suite });
+      if (!seen) process.stderr.write(`testwatch: no tests could be read from "${s.command}", so the monitor only shows that it ran. ` +
+        'Give it TAP output, the Playwright reporter or regex rules in .testmonitor.json (see docs/convention.md in the test-monitor repo).\n');
       resolve({ code: code === null ? 1 : code, failed });
     });
   });

@@ -1,6 +1,17 @@
 # Making it the default for Claude
 
-Two pieces on every machine where Claude runs tests (the Mac mini, KurtPC, and cloud sessions through their setup script).
+On every machine where Claude runs tests (the Mac mini, KurtPC, and cloud sessions through their setup script).
+
+## The quick way
+
+```sh
+npm install -g github:KVachon/test-monitor
+testwatch --install-claude --url https://tests.kvach.co
+```
+
+That adds the hook and the rule below, and saves where runs go. Set `TESTMONITOR_TOKEN` before running it, and it saves the token too (in `~/.test-monitor/token`). At home, `--url http://192.168.86.20:7357` skips the tunnel. It's safe to run again.
+
+The steps it does, by hand:
 
 ## 1. Install testwatch
 
