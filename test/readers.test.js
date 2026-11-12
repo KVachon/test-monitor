@@ -6,6 +6,8 @@ const { normalize } = require('../lib/events');
 
 const feed = (r, text) => text.split('\n').flatMap(l => r.line(l + '\n')).concat(r.end());
 
+
+test.describe('readers', () => {
 test('marker lines parse, other lines do not', () => {
   assert.deepStrictEqual(parseMarker('@@testmonitor {"type":"test-end","id":"a"}\n'), { type: 'test-end', id: 'a' });
   assert.strictEqual(parseMarker('ok @@testmonitor {}'), null);
@@ -59,4 +61,5 @@ test('normalize rejects bad events and trims good ones', () => {
   assert.throws(() => normalize({ type: 'run-start', run: '../etc' }));
   assert.deepStrictEqual(normalize({ type: 'test-end', run: 'r1', suite: 's', id: 'a', status: 'pass', extra: 1, desc: ' hi\n' }),
     { type: 'test-end', run: 'r1', suite: 's', id: 'a', status: 'pass', desc: 'hi' });
+});
 });

@@ -23,6 +23,8 @@ const runEvents = (run, at, fail) => [
   { type: 'run-end', run, status: fail ? 'fail' : 'pass', at: at + 100 },
 ];
 
+
+test.describe('server', () => {
 test('stores a run, keeps the sender spacing, and serves it with the previous run', async () => {
   await withServer({}, async base => {
     const at = Date.now() - 1000;
@@ -76,4 +78,5 @@ test('the stream says hello with the latest run, then sends new events', async (
     await until('"id":"a"');
     ctl.abort();
   });
+});
 });

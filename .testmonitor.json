@@ -1,0 +1,6 @@
+{
+  "project": "test-monitor",
+  "suites": [
+    { "name": "unit", "label": "node --test", "command": "node --test --test-reporter=tap \"test/*.test.js\"", "reader": "tap" }
+  ]
+}
