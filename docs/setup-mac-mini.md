@@ -13,6 +13,8 @@ chmod 600 ~/.test-monitor/token
 
 ## 2. Keep it running (launchd)
 
+The quick way: `bash ~/test-monitor/scripts/setup-mac-mini.sh` does this step plus the Claude hook and rule from docs/claude-setup.md, and can be run again safely. It starts node through a login shell, so it keeps working when the Node version changes. The manual way:
+
 Save as `~/Library/LaunchAgents/org.testmonitor.plist`, with your Node path from `which node`:
 
 ```xml

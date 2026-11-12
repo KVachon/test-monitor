@@ -2,7 +2,7 @@
 
 The portal's tests run on KurtPC (Windows, in the Local site). To report them to the monitor on the mini:
 
-1. Copy `.testmonitor.json` into the portal's root. Check `url` against the mini's name on the network.
+1. Copy `.testmonitor.json` into the portal's root. `url` is the mini on the home network (its current address is 192.168.86.20, worth reserving in the router if `.local` names don't resolve on the PC).
 2. Set `TESTMONITOR_TOKEN` on the PC (or put the token in `%USERPROFILE%\.test-monitor\token`).
 3. Add the Test Monitor reporter to the portal's Playwright config, next to the reporter it uses now:
    ```js

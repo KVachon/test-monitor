@@ -1,6 +1,6 @@
 {
   "project": "amchp-member-portal",
-  "url": "http://mac-mini.local:7357",
+  "url": "http://Kurts-Mac-mini.local:7357",
   "suites": [
     {
       "name": "php",
