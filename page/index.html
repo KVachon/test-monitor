@@ -68,15 +68,27 @@ main{padding-block:28px 40px}
 .rate small{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:2px}
 
 /* pace */
-.trace{position:relative;height:112px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0) 70%),var(--well);border:1px solid var(--hair);overflow:hidden}
-.trace svg{display:block;width:100%;height:100%}
+.trace{position:relative;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0) 70%),var(--well);border:1px solid var(--hair);overflow:hidden}
+.trace svg{display:block;width:100%;height:auto;overflow:visible}
+.trace .pip{left:14px;top:12px}
+.legend{display:inline-flex;align-items:center;gap:6px;font:11px var(--mono);color:var(--ink-3);white-space:nowrap}
+.legend i{display:block;width:10px;height:10px;border-radius:2px;background:#fff}
 .pip{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
 .pip::before,.pip::after{content:"";position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--run)}
 .pip::before{animation:ring 1.6s ease-out infinite}
 .pip::after{box-shadow:0 0 0 3px rgba(255,255,255,.12),0 0 14px rgba(255,255,255,.7)}
 .pip[hidden]{display:none}
 .axis{position:relative;height:18px;margin-top:4px}
-.axis span{position:absolute;top:0;font:10.5px/18px var(--mono);color:var(--ink-3);white-space:nowrap;padding-left:6px;border-left:1px dashed var(--hair-3)}
+.axis span{position:absolute;top:0;font:10.5px/18px var(--mono);color:var(--faint);white-space:nowrap;transform:translateX(-50%)}
+.axis span.su{transform:none;padding-left:6px;border-left:1px solid var(--hair-3);color:var(--ink-3)}
+.chart{position:relative}
+.tip{position:absolute;z-index:3;pointer-events:none;min-width:150px;max-width:300px;padding:8px 10px;border-radius:10px;background:rgba(28,28,31,.96);border:1px solid var(--hair-2);box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:12px;line-height:1.45;color:var(--ink-2)}
+.tip[hidden]{display:none}
+.tip b{display:block;font:600 15px var(--f);color:var(--ink);letter-spacing:-.01em}
+.tip b small{font:500 11px var(--mono);margin-left:6px;color:var(--ink-3)} .tip b small.f{color:var(--fail)} .tip b small.y{color:var(--flaky)}
+.tip .i{display:block;font:11.5px var(--mono);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tip .d{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tip .p{display:block;color:var(--ink-3);margin-top:2px}
 .now{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-auto-rows:24px;column-gap:10px;align-items:center;margin-top:8px;font-size:13px;line-height:24px;min-width:0}
 .now>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .now .k{font:500 11px/20px var(--mono);color:var(--ink-2);background:var(--raise);border:1px solid var(--hair);border-radius:6px;padding:0 7px}
@@ -218,8 +230,8 @@ main{padding-block:28px 40px}
 
   <section>
     <div class="hd"><h2>How long each test took</h2><span class="rate num" id="rate">0</span></div>
-    <div class="trace"><svg id="svg" viewBox="0 0 1000 112" role="img" aria-label="One bar per finished test, its height how long the test took; failures in red"></svg><span class="pip" id="pip" hidden></span></div>
-    <div class="axis" id="axis" aria-hidden="true"></div>
+    <div class="chart"><div class="trace"><svg id="svg" viewBox="0 0 1000 100" role="img" aria-label="Every test as a square, one row per feature; the brighter the square, the longer the test took. Failed tests are red, flaky amber, tests not run yet are empty."></svg><span class="pip" id="pip" hidden></span></div>
+    <div class="tip" id="tip" hidden></div></div>
     <div class="now" aria-live="polite"><span class="k" id="nk"></span><span class="id" id="ni"></span><span class="d" id="nd"></span><span class="eta num" id="etaw"><b id="nl">0</b> to go<span id="eta"></span></span></div>
   </section>
 
@@ -272,21 +284,21 @@ const snow=()=>Date.now()+offset;
 let suites=[],sby={},groups=[],gby={},tby={},total=0,cur=null,shown=null,pinned=null,lastSuite=null;
 let pass=0,fail=0,skip=0,clock=0,doneMs=0,doneN=0,skel={},expectMs=0;
 // chart state
-let bars=[],suiteAt=[],SLOTS=1,CEIL=5000,FLOOR=5,slowest=null,hover=null,finished=false;
+let bars=[],slots=[],SLOTS=1,CEIL=5000,FLOOR=5,slowest=null,hover=null,finished=false;
 
 function resetModel(){
   suites=[];sby={};groups=[];gby={};tby={};total=0;cur=null;shown=null;pinned=null;lastSuite=null;
   pass=0;fail=0;skip=0;clock=0;doneMs=0;doneN=0;finished=false;
-  bars=[];suiteAt=[];slowest=null;hover=null;
+  bars=[];slots=[];slowest=null;hover=null;
   const prev=R&&R.previous;
   skel={};(prev?.suites||[]).forEach(s=>skel[s.suite]=s);
   // The height scale (log, so quick unit tests and slow browser tests both read) comes from the last run's
   // quickest and slowest tests and stays put. A slower test changes it once, in one step (see finish).
   const prevMs=(prev?.suites||[]).flatMap(s=>s.tests.map(t=>t.ms)).filter(v=>v>0).sort((a,b)=>a-b);
-  if(prevMs.length>=5){CEIL=Math.max(50,prevMs.at(-1)*1.3);FLOOR=Math.max(1,Math.min(prevMs[Math.floor(prevMs.length*.05)]*.5,CEIL/20))}
+  if(prevMs.length>=5){CEIL=Math.max(50,prevMs.at(-1)*2);FLOOR=Math.max(1,Math.min(prevMs[Math.floor(prevMs.length*.05)]*.5,CEIL/20))}
   else{CEIL=5000;FLOOR=5}
   expectMs=prev?.durationMs||0;
-  $('suites').innerHTML='';$('fails').innerHTML='';$('axis').innerHTML='';$('none').hidden=false;$('fc').textContent='';
+  $('suites').innerHTML='';$('fails').innerHTML='';$('none').hidden=false;$('fc').textContent='';
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
   $('nk').textContent='';$('ni').textContent='';$('nd').textContent='';
   $('dot').className='orb'+(R?' run':'');$('h').textContent=R?'Running tests':'Waiting for a test run';
@@ -330,7 +342,7 @@ function addTest(sid,t){
   const s=ensureSuite(sid),k=sid+'\0'+t.id;let it=tby[k];
   if(it){if(t.desc&&!it.d)it.d=t.desc;if(t.groupName&&!it.g.name){it.g.name=t.groupName;cellText(it.g)}return it}
   const o=ensureGroup(s,t.group||s.label,t.groupName);
-  it=tby[k]={id:t.id,d:t.desc||'',g:o,i:o.items.length,prevMs:t.ms,st:''};o.items.push(it);
+  it=tby[k]={id:t.id,d:t.desc||'',g:o,i:o.items.length,prevMs:t.ms,st:'',slot:slots.length};o.items.push(it);slots.push(it);
   s.n++;total++;s.sl.textContent=`${s.label} · ${s.n}`;
   if(shown===o)$('ot').insertAdjacentHTML('beforeend',tickHtml(it));
   ticksDirty=true;
@@ -361,7 +373,6 @@ function apply(ev){
       // The plan lays the grid out now. Without one, use the last run's tests for this suite.
       const prevMs={};(skel[ev.suite]?.tests||[]).forEach(t=>prevMs[t.id]=t.ms);
       (ev.tests||[]).forEach(t=>addTest(ev.suite,{...t,ms:t.ms??prevMs[t.id]}));
-      if(lastSuite&&lastSuite!==s&&bars.length)suiteAt.push([bars.length,s.label]);
       if(!bars.length)SLOTS=Math.max(SLOTS,total);
       s.lastEnd=clock;lastSuite=s;break}
     case 'test-start':{const it=addTest(ev.suite,ev);if(it.st&&it.st!=='r')break;begin(it);break}
@@ -371,7 +382,7 @@ function apply(ev){
   }
 }
 function begin(it){const o=it.g,s=o.suite;cur=it;it.st='r';it.at=clock;
-  if(lastSuite&&lastSuite!==s&&bars.length)suiteAt.push([bars.length,s.label]);lastSuite=s;
+  lastSuite=s;
   groups.forEach(x=>x.el.classList.toggle('live',x===o));o.el.classList.remove('idle');
   if(!pinned&&shown!==o)show(o);else setTick(it);
   const keyed=o.name&&o.name!==o.key;
@@ -381,7 +392,7 @@ function finish(it,ev){const o=it.g,s=o.suite;o.done++;
   const from=Math.min(it.at??clock,s.lastEnd??clock),ms=ev.ms??Math.max(0,clock-from);s.lastEnd=clock;
   o.ms+=ms;doneMs+=ms;doneN++;it.ms=ms;bars.push(it);
   // Slower than the scale allows: the scale changes once, with room to spare, rather than creeping.
-  if(ms>CEIL)CEIL=ms*1.6;if(!slowest||ms>slowest.ms)slowest=it;
+  if(ms>CEIL)CEIL=ms*2;if(!slowest||ms>slowest.ms)slowest=it;
   if(ev.status==='fail'){fail++;o.bad++;it.st='f';addFail(it,ev.reason||'failed');
     const m=document.createElement('b');m.style.left=`${it.i/o.items.length*100}%`;o.meter.appendChild(m)}
   else if(ev.status==='skip'){skip++;it.st='s'}
@@ -402,49 +413,64 @@ function finish_run(status){finished=true;cur=null;groups.forEach(x=>{x.el.class
   $('ctrl').classList.remove('off')}
 
 // ---------- chart ----------
-// One bar per test, in the order they finish, its height how long the test took. Each test gets a fixed slot
-// (the run's size is known from the plan or the last run) and the height scale is set from the last run, so a
-// bar never moves once drawn. The running test grows in the next slot, with the dot on top.
+// One bar per test, its height how long the test took (log scale). Every test has a fixed slot in run order,
+// laid out from the plan or the last run, so bars sit under their feature and never move once drawn. Slots
+// still to come show last run's time as a faint bar, so the shape of the run ahead is there from the start.
 const fmtMs=ms=>ms<1000?Math.round(ms)+'ms':ms<60000?(ms/1000).toFixed(ms<10000?1:0)+'s':secs(ms);
 // Time left: each test that hasn't finished costs what it took last run, or the average so far.
 function timeLeft(){if(!total||finished)return null;const avg=doneN?doneMs/doneN:null;let left=0,unknown=0;
   groups.forEach(o=>o.items.forEach(it=>{if(it.done)return;const ms=it.prevMs??avg;if(ms==null){unknown++;return}left+=ms}));
   if(unknown)return null;if(cur&&cur.at!=null)left=Math.max(0,left-(clock-cur.at));return left}
-function draw(){const svg=$('svg'),W=svg.clientWidth||1000,H=svg.clientHeight||112,top=14,bot=H-3;svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  // More tests than slots (no plan, or the suite grew): make room once, with headroom so it rarely happens twice.
-  if(bars.length+(cur?1:0)>SLOTS)SLOTS=Math.ceil(Math.max(total,bars.length+1)*1.15);
-  const GUT=44,PW=W-GUT,bw=PW/SLOTS,gap=bw>=4?1:bw>=2.5?.5:0,y=ms=>bot-Math.max(.025,Math.log(Math.min(Math.max(ms,FLOOR),CEIL)/FLOOR)/Math.log(CEIL/FLOOR))*(bot-top);
-  let s=`<defs><linearGradient id="bp" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#fff" stop-opacity=".82"/><stop offset="1" stop-color="#fff" stop-opacity=".22"/></linearGradient>
-    <linearGradient id="bf" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bot}"><stop offset="0" stop-color="#ff5f57" stop-opacity="1"/><stop offset="1" stop-color="#ff5f57" stop-opacity=".35"/></linearGradient>
-    <linearGradient id="fc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5f57" stop-opacity=".28"/><stop offset="1" stop-color="#ff5f57" stop-opacity=".04"/></linearGradient></defs>`;
-  // Guide lines at round durations, labelled on the right.
-  const guides=[5,10,25,50,100,250,500,1000,2000,5000,10000,30000,60000].filter(v=>v>FLOOR*1.5).filter(v=>v<CEIL*.92&&y(v)>top+10&&y(v)<bot-12);
-  // Keep a guide only if it's well clear of the last one kept, preferring round decades.
-  let lastY=1e9;const keep=[];[...guides].sort((a,b)=>(/^10*$/.test(b)-/^10*$/.test(a))||a-b).forEach(v=>{if(keep.every(k=>Math.abs(y(k)-y(v))>22))keep.push(v)});
-  keep.forEach(v=>{const gy=Math.round(y(v))+.5;
-    s+=`<line x1="0" x2="${PW}" y1="${gy}" y2="${gy}" stroke="#fff" stroke-opacity=".05"/><text x="${W-8}" y="${gy-3}" text-anchor="end" font-size="9.5" font-family="var(--mono)" fill="#fff" fill-opacity=".45" stroke="#18181b" stroke-width="3" paint-order="stroke">${fmtMs(v)}</text>`});
-  suiteAt.forEach(([n])=>{const sx=Math.round(n*bw)+.5;s+=`<line x1="${sx}" x2="${sx}" y1="0" y2="${H}" stroke="#fff" stroke-opacity=".18" stroke-dasharray="2 3"/>`});
-  const rx=bw-gap>=3?1:0;
-  const bar=(i,ms,fill,op)=>{const bx=i*bw,by=Math.min(y(ms),bot-1.5);
-    return `<rect x="${(bx+gap/2).toFixed(2)}" y="${by.toFixed(1)}" width="${Math.max(.6,bw-gap).toFixed(2)}" height="${(bot-by+rx).toFixed(1)}" rx="${rx}" fill="${fill}"${op?` fill-opacity="${op}"`:''}/>`};
-  // A failure tints its whole column, so it shows however quick the test was.
-  bars.forEach((it,i)=>{if(it.st==='f')s+=`<rect x="${(i*bw).toFixed(2)}" y="0" width="${Math.max(2,bw).toFixed(2)}" height="${H}" fill="url(#fc)"/>`});
-  bars.forEach((it,i)=>{const hv=hover===i;
-    if(it.st==='s')s+=bar(i,0,'#fff',hv?.6:.2);
-    else s+=bar(i,it.ms,it.st==='f'?'url(#bf)':it.st==='y'?'var(--flaky)':'url(#bp)',hv?1:it.st==='y'?.8:0);
-    if(it.ms>CEIL&&it.st!=='s')s+=`<rect x="${(i*bw+gap/2).toFixed(2)}" y="${top-3}" width="${Math.max(.6,bw-gap).toFixed(2)}" height="2" fill="${it.st==='f'?'#ff5f57':'#fff'}"/>`;
-    if(it.st==='f'){const cx=(i+.5)*bw;s+=`<circle cx="${cx.toFixed(1)}" cy="6" r="4.5" fill="#ff5f57" fill-opacity=".2"/><circle cx="${cx.toFixed(1)}" cy="6" r="2.2" fill="#ff5f57"/>`}});
+const GUT=44;
+// Every test is a square in its feature's row, in run order, so the whole run is one picture that fills in.
+// Brightness is how long the test took, on a log scale fixed from the last run (it changes once, in one step,
+// only if a test is slower than that allows). Squares never move: rows and positions come from the plan or the
+// last run, and a new test is added at the end of its row.
+let cellsAt=[];
+const shade=ms=>{const v=Math.min(1,Math.max(0,Math.log(Math.max(ms,FLOOR)/FLOOR)/Math.log(CEIL/FLOOR)));return .1+.85*v};
+function layout(){const svg=$('svg'),W=svg.clientWidth||1000,narrow=W<520,LW=narrow?76:132;
+  const maxN=Math.max(8,...groups.map(o=>o.items.length));
+  // Squares stay big enough to see and hover; a long feature wraps onto more lines rather than shrinking them.
+  const cs=Math.max(narrow?12:10,Math.min(16,Math.floor((W-LW)/maxN))),gap=2,SH=22,per=Math.max(1,Math.floor((W-LW)/cs));
+  const rows=[];let yy=0;
+  suites.forEach((su,k)=>{if(suites.length>1){rows.push({suite:su,y:yy});yy+=SH}
+    su.groups.forEach(o=>{const lines=Math.max(1,Math.ceil(o.items.length/per));rows.push({g:o,y:yy});yy+=lines*cs+(lines>1?3:0)});if(k<suites.length-1)yy+=6});
+  return {svg,W,LW,cs,gap,per,rows,H:Math.max(yy,cs),narrow}}
+function runMs(it){return clock-Math.min(it.at,it.g.suite.lastEnd??it.at)}
+function draw(){const {svg,W,LW,cs,gap,per,rows,H,narrow}=layout();svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('height',H);
+  const c=cs-gap,rx=c>=10?2.5:c>=6?1.5:1,hv=hover;let s='';cellsAt=[];
+  rows.forEach(r=>{
+    if(r.suite){s+=`<text x="0" y="${r.y+13}" font-size="10.5" font-family="IBM Plex Mono,ui-monospace,monospace" fill="#7b7b83">${esc(r.suite.label)}</text>`;return}
+    const o=r.g,keyed=o.name&&o.name!==o.key,ty=r.y+c/2+3.5;
+    const fit=(t,n)=>t.length>n?t.slice(0,n-1)+'…':t;
+    s+=`<text x="0" y="${ty}" font-size="11" font-family="IBM Plex Mono,ui-monospace,monospace" fill="${o.bad?'#ff5f57':'#b4b4ba'}">${esc(fit(o.key,Math.floor((LW-8)/6.7)))}</text>`;
+    if(keyed&&!narrow)s+=`<text x="${o.key.length*6.8+8}" y="${ty}" font-size="11.5" font-family="Inter,system-ui,sans-serif" fill="#7b7b83">${esc(o.name.length>13?o.name.slice(0,12)+'…':o.name)}</text>`;
+    o.items.forEach((it,i)=>{const x=LW+(i%per)*cs,y=r.y+Math.floor(i/per)*cs;cellsAt.push([x,y,it]);let fill='#fff',op=.045,extra='';
+      if(it.done){if(it.st==='f'){fill='#ff5f57';op=1}else if(it.st==='y'){fill='#f0b545';op=.9}else if(it.st==='s'){op=0;extra=` stroke="#fff" stroke-opacity=".28" stroke-width="1"`}else op=shade(it.ms)}
+      else if(it===cur&&!finished){op=Math.max(.25,shade(runMs(it)))}
+      if(it===hv)extra+=` stroke="#fff" stroke-width="1.5"`;
+      const inset=it.st==='s'&&it.done?.5:0;
+      s+=`<rect x="${x+inset}" y="${y+inset}" width="${c-2*inset}" height="${c-2*inset}" rx="${rx}" fill="${fill}" fill-opacity="${op}"${extra}/>`})});
+  svg.innerHTML=s;
   const pip=$('pip');pip.hidden=true;
-  if(cur&&!finished&&cur.at!=null){const i=bars.length,ms=clock-Math.min(cur.at,cur.g.suite.lastEnd??cur.at);
-    s+=bar(i,ms,'#fff',.9);pip.hidden=false;pip.style.transform=`translate(${((i+.5)*bw).toFixed(1)}px,${Math.min(y(ms),bot-1.5).toFixed(1)}px)`}
-  $('axis').innerHTML=suiteAt.map(([n,label])=>`<span style="left:${(n*bw/W*100).toFixed(2)}%">${esc(label)}</span>`).join('');
-  svg.innerHTML=s}
-function rateHtml(){const it=hover!=null?bars[hover]:null;
-  if(it)return `<small>${esc(it.g.name&&it.g.name!==it.g.key?it.id:it.g.key+' · '+(it.d||it.id))}</small> ${fmtMs(it.ms)}`;
-  return slowest?`<small>slowest</small> ${fmtMs(slowest.ms)}`:''}
-$('svg').addEventListener('mousemove',e=>{const r=e.currentTarget.getBoundingClientRect(),i=Math.floor((e.clientX-r.left)/(r.width-44)*SLOTS);
-  const h=i>=0&&i<bars.length?i:null;if(h!==hover){hover=h;draw();$('rate').innerHTML=rateHtml()}});
-$('svg').addEventListener('mouseleave',()=>{hover=null;draw();$('rate').innerHTML=rateHtml()});
+  if(cur&&!finished&&cur.at!=null){const at=cellsAt.find(a=>a[2]===cur);if(at){pip.hidden=false;pip.style.transform=`translate(${at[0]+c/2}px,${at[1]+c/2}px)`}}
+  tip()}
+function tip(){const t=$('tip'),it=hover;if(!it){t.hidden=true;return}
+  const at=cellsAt.find(a=>a[2]===it);if(!at){t.hidden=true;return}
+  const {W,cs}=layout(),keyed=it.g.name&&it.g.name!==it.g.key;
+  const st=it.st==='f'?'<small class="f">failed</small>':it.st==='y'?'<small class="y">flaky</small>':'';
+  const val=it.done?(it.st==='s'?'Skipped':fmtMs(it.ms)):it===cur?fmtMs(runMs(it)):'Not run yet';
+  const prev=it.prevMs!=null?`Last run ${fmtMs(it.prevMs)}`:'';
+  t.innerHTML=`<b>${val}${it.done&&it.st!=='s'?st:it===cur?'<small>running</small>':''}</b><span class="i"></span><span class="d"></span>${prev?`<span class="p">${prev}</span>`:''}`;
+  t.querySelector('.i').textContent=keyed?it.id:`${it.g.key}`;t.querySelector('.d').textContent=it.d||(keyed?'':it.id);
+  t.hidden=false;const tw=t.offsetWidth,th=t.offsetHeight,x=at[0]+14,y=at[1]+12;
+  t.style.left=(x+cs+10+tw<=W+28?x+cs+10:Math.max(0,x-10-tw))+'px';t.style.top=Math.max(0,y+cs/2-th/2)+'px'}
+// The header shows the scale: from quick to slow, with the times at each end.
+function rateHtml(){const sw=[.1,.31,.53,.74,.95].map(o=>`<i style="opacity:${o}"></i>`).join('');
+  return `<span class="legend">${fmtMs(FLOOR)} ${sw} ${fmtMs(CEIL)}</span>`}
+$('svg').addEventListener('pointermove',e=>{const r=e.currentTarget.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{cs}=layout();
+  const a=cellsAt.find(([x,y])=>px>=x-1&&px<x+cs&&py>=y-1&&py<y+cs);const h=a?a[2]:null;if(h!==hover){hover=h;draw()}});
+$('svg').addEventListener('pointerleave',()=>{hover=null;draw()});
 addEventListener('resize',()=>draw());
 
 function paint(){$('np').textContent=pass;$('nf').textContent=fail;$('nl').textContent=Math.max(0,total-pass-fail-skip);$('el').textContent=secs(clock);
