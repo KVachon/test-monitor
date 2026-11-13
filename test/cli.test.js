@@ -58,7 +58,7 @@ test.describe('cli', () => {
       let out = '';
       c.stdout.on('data', d => { out += d; });
       try {
-        for (let i = 0; i < 50 && !out.includes('running at'); i++) await new Promise(r => setTimeout(r, 100));
+        for (let i = 0; i < 50 && !out.includes('made a token'); i++) await new Promise(r => setTimeout(r, 100));
         assert.match(out, /listening on 127\.0\.0\.1:/);
         assert.match(out, /only this machine can reach it/);
         const token = fs.readFileSync(path.join(home, '.kurtest', 'token'), 'utf8').trim();
@@ -77,7 +77,7 @@ test.describe('cli', () => {
       let oout = '';
       o.stdout.on('data', d => { oout += d; });
       try {
-        for (let i = 0; i < 50 && !oout.includes('running at'); i++) await new Promise(r => setTimeout(r, 100));
+        for (let i = 0; i < 50 && !oout.includes('can send runs'); i++) await new Promise(r => setTimeout(r, 100));
         assert.match(oout, /listening on 0\.0\.0\.0:/);
         assert.ok(!fs.existsSync(path.join(old, 'token')));
       } finally { o.kill(); }
