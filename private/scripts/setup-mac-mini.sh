@@ -5,7 +5,7 @@
 #  - the Claude Code hook in ~/.claude/settings.json
 #  - the testing rule in ~/.claude/CLAUDE.md (following the symlink if there is one)
 set -euo pipefail
-REPO="$(cd "$(dirname "$0")/.." && pwd)"
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 mkdir -p "$HOME/.test-monitor" "$HOME/Library/LaunchAgents" "$HOME/.claude"
 
 # 1. LaunchAgent
@@ -52,7 +52,7 @@ if grep -q "## Tests report to the Test Monitor" "$RULES" 2>/dev/null; then
   echo "✓ Rule was already in $RULES"
 else
   [ -f "$RULES" ] && cp "$RULES" "$RULES.bak-testmonitor"
-  awk '/^```markdown$/{on=1;next} on&&/^```$/{exit} on' "$REPO/docs/claude-setup.md" | { echo; cat; } >> "$RULES"
+  awk '/^```markdown$/{on=1;next} on&&/^```$/{exit} on' "$REPO/private/claude-setup.md" | { echo; cat; } >> "$RULES"
   echo "✓ Rule added to $RULES"
 fi
 

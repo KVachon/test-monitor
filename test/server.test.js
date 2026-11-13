@@ -65,6 +65,53 @@ test('a token is needed to send, and to read from outside the network', async ()
   });
 });
 
+test('opening the page with the token signs in with a cookie and drops the token from the address', async () => {
+  await withServer({ token: 'sekrit' }, async base => {
+    const away = { 'cf-connecting-ip': '1.2.3.4' };
+    let res = await fetch(base + '/', { headers: away });
+    assert.strictEqual(res.status, 401);
+    assert.match(await res.text(), /<form/);
+    res = await fetch(base + '/?token=wrong', { headers: away, redirect: 'manual' });
+    assert.strictEqual(res.status, 401);
+    res = await fetch(base + '/?token=sekrit&run=r1', { headers: { ...away, 'x-forwarded-proto': 'https' }, redirect: 'manual' });
+    assert.strictEqual(res.status, 302);
+    assert.strictEqual(res.headers.get('location'), '/?run=r1');
+    const cookie = res.headers.get('set-cookie');
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /SameSite=Lax/);
+    assert.match(cookie, /Secure/);
+    const jar = cookie.split(';')[0];
+    assert.strictEqual((await fetch(base + '/api/runs', { headers: { ...away, cookie: jar } })).status, 200);
+    assert.strictEqual((await fetch(base + '/', { headers: { ...away, cookie: jar } })).status, 200);
+    // The cookie is for reading only: sending still needs the token itself.
+    assert.strictEqual((await post(base, runEvents('r1', Date.now(), false), { ...away, cookie: jar })).status, 401);
+  });
+});
+
+test('the fonts load without the token, so the sign-in page can use them', async () => {
+  await withServer({ token: 'sekrit' }, async base => {
+    const res = await fetch(base + '/fonts/inter-latin-400-normal.woff2', { headers: { 'cf-connecting-ip': '1.2.3.4' } });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.headers.get('content-type'), 'font/woff2');
+    assert.strictEqual((await fetch(base + '/fonts/../server.js')).status, 404);
+  });
+});
+
+// The local network can see the page only with lanView. Needs a private address on this machine to test.
+const lanAddr = Object.values(require('os').networkInterfaces()).flat()
+  .find(i => i && i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(i.address));
+test('the local network sees the page only with lanView', { skip: !lanAddr && 'no private network address here' }, async () => {
+  for (const lanView of [false, true]) {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-'));
+    const server = createMonitor({ dataDir, token: 'sekrit', lanView });
+    await new Promise(r => server.listen(0, lanAddr.address, r));
+    try {
+      const res = await fetch(`http://${lanAddr.address}:${server.address().port}/api/runs`);
+      assert.strictEqual(res.status, lanView ? 200 : 401);
+    } finally { server.close(); server.closeAllConnections(); fs.rmSync(dataDir, { recursive: true, force: true }); }
+  }
+});
+
 test('the stream says hello with the latest run, then sends new events', async () => {
   await withServer({}, async base => {
     await post(base, [{ type: 'run-start', run: 'r1', project: 'p' }]);

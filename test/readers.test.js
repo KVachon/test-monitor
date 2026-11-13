@@ -1,15 +1,20 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { createReader, parseMarker } = require('../lib/readers');
+const { createReader, parseMarker, isMarkerStart } = require('../lib/readers');
 const { normalize } = require('../lib/events');
 
 const feed = (r, text) => text.split('\n').flatMap(l => r.line(l + '\n')).concat(r.end());
 
 
 test.describe('readers', () => {
-test('marker lines parse, other lines do not', () => {
+test('marker lines parse, under either name, and other lines do not', () => {
+  assert.deepStrictEqual(parseMarker('@@kurtest {"type":"test-end","id":"a"}\n'), { type: 'test-end', id: 'a' });
+  assert.deepStrictEqual(parseMarker('  @@kurtest {"type":"test-end","id":"a"}\n'), { type: 'test-end', id: 'a' });
   assert.deepStrictEqual(parseMarker('@@testmonitor {"type":"test-end","id":"a"}\n'), { type: 'test-end', id: 'a' });
+  assert.strictEqual(parseMarker('ok @@kurtest {}'), null);
+  assert.ok(isMarkerStart('@@kur') && isMarkerStart('@@testm') && isMarkerStart('@@kurtest {"ty'));
+  assert.ok(!isMarkerStart('ok 1 - a') && !isMarkerStart('@@other'));
   assert.strictEqual(parseMarker('ok @@testmonitor {}'), null);
   assert.strictEqual(parseMarker('@@testmonitor {broken'), null);
 });

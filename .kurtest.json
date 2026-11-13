@@ -1,0 +1,6 @@
+{
+  "project": "kurtest",
+  "suites": [
+    { "name": "unit", "label": "node --test", "command": "node test/run.js --test-reporter=tap", "reader": "tap" }
+  ]
+}

@@ -1,22 +1,23 @@
 'use strict';
-// Playwright reporter for the Test Monitor. Add it next to your usual reporter:
+// Playwright reporter for KurTest. Add it next to your usual reporter:
 //
-//   reporter: [['list'], ['/path/to/test-monitor/reporters/playwright.cjs']]
+//   reporter: [['list'], ['kurtest/playwright']]          (with kurtest in devDependencies)
+//   reporter: [['list'], ['/path/to/kurtest/reporters/playwright.cjs']]
 //
-// It prints @@testmonitor lines only when the tests run under testwatch, and is silent otherwise.
+// It prints @@kurtest lines only when the tests run under kurtest, and is silent otherwise.
 // Groups are spec files; ids are the file plus the test's title path, so they stay stable.
 
 const path = require('path');
 
-const MARKER = '@@testmonitor ';
+const MARKER = '@@kurtest ';
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const humanize = s => { const t = s.replace(/[-_.]+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 const firstLine = s => String(s || '').replace(/\u001b\[[0-9;]*m/g, '').split('\n').map(l => l.trim()).find(Boolean) || '';
 
-class TestMonitorReporter {
+class KurTestReporter {
   constructor(options = {}) {
-    this.on = !!process.env.TESTMONITOR;
-    this.suite = process.env.TESTMONITOR_SUITE || options.suite || 'playwright';
+    this.on = !!(process.env.KURTEST || process.env.TESTMONITOR);
+    this.suite = process.env.KURTEST_SUITE || process.env.TESTMONITOR_SUITE || options.suite || 'playwright';
     this.ms = new Map();
   }
 
@@ -67,4 +68,4 @@ class TestMonitorReporter {
   printsToStdio() { return false; }
 }
 
-module.exports = TestMonitorReporter;
+module.exports = KurTestReporter;
