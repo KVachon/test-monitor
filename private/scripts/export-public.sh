@@ -26,3 +26,11 @@ if command -v gitleaks >/dev/null; then gitleaks detect --no-git --source "$OUT"
 else echo "! gitleaks isn't installed; install it and rerun before publishing"; fi
 
 (cd "$OUT" && node test/run.js >/dev/null) && echo "✓ Tests pass in the copy"
+
+# The public repo starts with this one commit, as Kurt's GitHub no-reply address (no real email in history).
+cd "$OUT"
+git init -q -b main
+git add -A
+git -c user.name="Kurt Vachon" -c user.email="413068+KVachon@users.noreply.github.com" \
+  commit -q -m "KurTest 0.1.0: a live page for your test runs"
+echo "✓ First commit ready in $OUT ($(git rev-parse --short HEAD)); push it to the new repo's main"
