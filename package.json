@@ -1,17 +1,29 @@
 {
-  "name": "test-monitor",
+  "name": "kurtest",
   "version": "0.1.0",
-  "description": "A live page for test runs, from any project and any machine.",
-  "license": "UNLICENSED",
-  "private": true,
-  "engines": { "node": ">=18" },
+  "description": "A live page for your test runs, from any project and any machine.",
+  "license": "MIT",
+  "author": "Kurt Vachon",
+  "homepage": "https://github.com/KVachon/kurtest#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/KVachon/kurtest.git" },
+  "bugs": "https://github.com/KVachon/kurtest/issues",
+  "keywords": ["test", "testing", "dashboard", "live", "test-runner", "playwright", "tap", "reporter", "claude-code"],
+  "engines": { "node": ">=20" },
   "bin": {
+    "kurtest": "bin/kurtest.js",
     "testwatch": "bin/testwatch.js",
     "test-monitor": "bin/test-monitor.js"
   },
+  "exports": {
+    ".": "./lib/index.js",
+    "./playwright": "./reporters/playwright.cjs",
+    "./reporters/playwright.cjs": "./reporters/playwright.cjs",
+    "./package.json": "./package.json"
+  },
+  "files": ["bin/", "lib/", "page/", "reporters/", "docs/claude-code.md", "LICENSE"],
   "scripts": {
-    "start": "node bin/test-monitor.js",
-    "demo": "cd examples/demo && node ../../bin/testwatch.js",
-    "test": "node --test \"test/*.test.js\""
+    "start": "node bin/kurtest.js serve",
+    "demo": "cd examples/demo && node ../../bin/kurtest.js",
+    "test": "node test/run.js"
   }
 }

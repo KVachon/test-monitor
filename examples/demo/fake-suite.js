@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// A pretend test suite for trying the monitor. It prints @@testmonitor lines (the "marker" reader)
+// A pretend test suite for trying the monitor. It prints @@kurtest lines (the "marker" reader)
 // or TAP, with a few failures and a flaky test, at a speed you choose.
 //
 //   node fake-suite.js markers [speed]   speed 1 is real time (about 6 minutes); the default is 20
@@ -11,7 +11,7 @@ const speed = Number(process.argv[3] || process.env.DEMO_SPEED || 20);
 let seed = 7;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const sleep = ms => new Promise(r => setTimeout(r, ms / speed));
-const say = ev => process.stdout.write('@@testmonitor ' + JSON.stringify(ev) + '\n');
+const say = ev => process.stdout.write('@@kurtest ' + JSON.stringify(ev) + '\n');
 
 const features = ['Sign in', 'Profile', 'Directory', 'Events', 'Uploads', 'Search', 'Payments', 'Reports', 'Admin', 'Email', 'Exports', 'Settings'];
 const words = ['shows', 'rejects', 'saves', 'lists', 'hides', 'sorts', 'escapes', 'limits', 'redirects', 'keeps'];

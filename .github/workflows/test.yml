@@ -1,0 +1,42 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      # The command people try first, from a packed copy, the way npm would install it.
+      - name: Try it the way a newcomer would
+        shell: bash
+        run: |
+          npm pack --silent
+          npm install -g ./kurtest-*.tgz
+          kurtest --version
+          kurtest --project smoke -- node -e "console.log('TAP version 13\nok 1 - works\n1..1')"
+          curl -fsS -H "Authorization: Bearer $(kurtest token 2>/dev/null)" localhost:7357/api/runs | grep -q '"project":"smoke"'
+          kurtest stop
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t kurtest .
+      - name: The image answers, makes a token, and asks for it
+        run: |
+          docker run -d --name kt -p 127.0.0.1:7357:7357 kurtest
+          for i in $(seq 1 20); do curl -fsS localhost:7357/healthz && break; sleep 0.5; done
+          test -n "$(docker exec kt kurtest token 2>/dev/null)"
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:7357/api/runs)" = 401

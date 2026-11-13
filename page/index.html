@@ -3,10 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Test Monitor</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<title>KurTest</title>
 <style>
-/* Live page for the Test Monitor, built from design/mockup-template.html. Deliberately dark-only: one instrument panel on a black desk.
+/* Bundled fonts (SIL OFL 1.1, see page/fonts), so the page works offline and calls nobody. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/inter-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/inter-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/inter-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ibm-plex-mono-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:500;font-display:swap;src:url(/fonts/ibm-plex-mono-latin-500-normal.woff2) format('woff2')}
+/* The live page for KurTest. Deliberately dark-only: one instrument panel on a black desk.
    Layout: header (status, elapsed, counts, run progress), pace chart, the open group's ticks,
    the group grid, failures, and a quiet footer. Every region has a fixed height while running. */
 :root{
@@ -235,7 +240,7 @@ main{padding-block:28px 40px}
 <main class="gut"><div class="col panel">
   <header class="head">
     <div class="orb" id="dot" aria-hidden="true"><i></i></div>
-    <div class="ttl"><h1 id="h">Waiting for a test run</h1><p id="sub"><span id="proj">Test Monitor</span><span id="cmdw" hidden> · <code id="cmd"></code></span></p></div>
+    <div class="ttl"><h1 id="h">Waiting for a test run</h1><p id="sub"><span id="proj">KurTest</span><span id="cmdw" hidden> · <code id="cmd"></code></span></p></div>
     <div class="right">
       <div class="el num" id="el">0s</div>
       <div class="counts">
@@ -324,7 +329,7 @@ function resetModel(){
   $('ot').innerHTML='';$('oh').innerHTML='';$('oc').textContent='';
   $('nk').textContent='';$('ni').textContent='';$('nd').textContent='';
   $('dot').className='orb'+(R?' run':'');$('h').textContent=R?'Running tests':'Waiting for a test run';
-  const m=R?.meta||{};$('proj').textContent=R?(m.project||'unnamed'):'Test Monitor';
+  const m=R?.meta||{};$('proj').textContent=R?(m.project||'unnamed'):'KurTest';
   $('cmd').textContent=m.command||'';$('cmdw').hidden=!m.command;
   $('src').innerHTML=R?`${esc(m.host||'unknown machine')} <b>· started ${clockTime(R.start)}</b>`:'';
   $('ctrl').classList.add('off');
