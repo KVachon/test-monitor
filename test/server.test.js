@@ -11,7 +11,7 @@ async function withServer(opts, fn) {
   const server = createMonitor({ dataDir, ...opts });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  try { await fn(base, dataDir); } finally { server.close(); server.closeAllConnections(); fs.rmSync(dataDir, { recursive: true, force: true }); }
+  try { await fn(base, dataDir, server); } finally { server.close(); server.closeAllConnections(); fs.rmSync(dataDir, { recursive: true, force: true }); }
 }
 const post = (base, body, headers = {}) => fetch(base + '/api/events', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
@@ -159,4 +159,79 @@ test('history: a run of one feature shares rows with the full run', async () => 
     assert.strictEqual(h.features[0].cells[1], null);
   });
 });
+});
+
+test.describe('runs that stop reporting', () => {
+  const MIN = 60 * 1000;
+  const get = async (base, id) => (await fetch(base + '/api/runs/' + id)).json();
+  // A run that started and got one test in, then went quiet: no run-end.
+  const cutOff = (run, at) => runEvents(run, at, false).slice(0, 3);
+
+  test('end as interrupted at the last thing they reported, and stop being the latest run', async () => {
+    let clock = Date.now();
+    await withServer({ now: () => clock }, async (base, dataDir, server) => {
+      await post(base, runEvents('r0', clock - 1000, false));
+      await post(base, cutOff('r1', clock));
+      const lastT = (await get(base, 'r1')).events.at(-1).t;
+      clock += 29 * MIN;
+      assert.strictEqual(server.sweep(), 0, 'a run without beats gets 30 minutes');
+      clock += 2 * MIN;
+      assert.strictEqual(server.sweep(), 1);
+      const r1 = await get(base, 'r1');
+      assert.strictEqual(r1.meta.status, 'interrupted');
+      assert.strictEqual(r1.meta.ended, lastT, 'the clock stops at the last event, not at the sweep');
+      assert.deepStrictEqual(r1.events.at(-1), { type: 'run-end', run: 'r1', status: 'interrupted', t: lastT, seq: 4 });
+      // A partial run isn't the layout or time estimate for the next one.
+      await post(base, runEvents('r2', clock, false).slice(0, 1));
+      assert.strictEqual((await get(base, 'r2')).previous.id, 'r0');
+      const index = JSON.parse(fs.readFileSync(path.join(dataDir, 'index.json'), 'utf8'));
+      assert.strictEqual(index.find(m => m.id === 'r1').status, 'interrupted');
+    });
+  });
+
+  test('a run left open while the monitor was down ends when it starts again', async () => {
+    let clock = Date.now();
+    await withServer({ now: () => clock }, async (base, dataDir) => {
+      await post(base, cutOff('r1', clock));
+      clock += 10 * 24 * 60 * MIN;
+      const again = createMonitor({ dataDir, now: () => clock });
+      await new Promise(r => again.listen(0, '127.0.0.1', r));
+      const r1 = await get(`http://127.0.0.1:${again.address().port}`, 'r1');
+      again.close(); again.closeAllConnections();
+      assert.strictEqual(r1.meta.status, 'interrupted');
+      assert.ok(r1.meta.ended - r1.meta.started < 1000);
+    });
+  });
+
+  test('heartbeats keep a quiet run open, and it ends 2 minutes after they stop', async () => {
+    let clock = Date.now();
+    await withServer({ now: () => clock }, async (base, dataDir, server) => {
+      await post(base, cutOff('r1', clock));
+      for (let i = 0; i < 10; i++) {
+        clock += 0.5 * MIN;
+        assert.strictEqual((await post(base, [{ type: 'heartbeat', run: 'r1', at: clock }])).status, 200);
+        assert.strictEqual(server.sweep(), 0);
+      }
+      assert.strictEqual((await get(base, 'r1')).events.length, 3, 'beats are not kept');
+      clock += 2 * MIN;
+      assert.strictEqual(server.sweep(), 1);
+      assert.strictEqual((await get(base, 'r1')).meta.status, 'interrupted');
+    });
+  });
+
+  test('a run that speaks again after being marked interrupted carries on', async () => {
+    let clock = Date.now();
+    await withServer({ now: () => clock }, async (base, dataDir, server) => {
+      const evs = runEvents('r1', clock, false);
+      await post(base, evs.slice(0, 3));
+      clock += 31 * MIN;
+      server.sweep();
+      await post(base, evs.slice(3).map(e => ({ ...e, at: clock })));
+      const r1 = await get(base, 'r1');
+      assert.strictEqual(r1.meta.status, 'pass');
+      assert.deepStrictEqual(r1.events.map(e => e.type), ['run-start', 'suite-start', 'test-end', 'test-end', 'run-end']);
+      const onDisk = fs.readFileSync(path.join(dataDir, 'runs', 'r1.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+      assert.deepStrictEqual(onDisk.map(e => e.status || e.type), ['run-start', 'suite-start', 'pass', 'pass', 'pass']);
+    });
+  });
 });

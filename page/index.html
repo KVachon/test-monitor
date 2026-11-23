@@ -454,9 +454,10 @@ function drawFail(f){const o=f.o,keyed=o.name&&o.name!==o.key;
 function finish_run(status){finished=true;cur=null;groups.forEach(x=>{x.el.classList.remove('live');if(x.done)x.el.classList.remove('idle')});
   groups.forEach(o=>o.items.forEach(it=>{if(it.st==='r'){it.st='';setTick(it)}}));
   const bad=fail>0||status==='fail';
-  $('dot').className='orb '+(status==='stopped'?'':bad?'bad':'ok');
-  $('h').textContent=status==='stopped'?'Run stopped':fail?`${fail} test${fail===1?'':'s'} failed`:bad?'Tests failed':'All tests passed';
-  $('nk').textContent='';$('ni').textContent='';$('nd').textContent=`Finished in ${secs(clock)}`;
+  const cut=status==='stopped'||status==='interrupted';
+  $('dot').className='orb '+(cut?'':bad?'bad':'ok');
+  $('h').textContent=status==='stopped'?'Run stopped':status==='interrupted'?'Run interrupted':fail?`${fail} test${fail===1?'':'s'} failed`:bad?'Tests failed':'All tests passed';
+  $('nk').textContent='';$('ni').textContent='';$('nd').textContent=status==='interrupted'?'':`Finished in ${secs(clock)}`;
   $('ctrl').classList.remove('off')}
 
 // ---------- chart ----------
@@ -465,9 +466,11 @@ function finish_run(status){finished=true;cur=null;groups.forEach(x=>{x.el.class
 // still to come show last run's time as a faint bar, so the shape of the run ahead is there from the start.
 const fmtMs=ms=>ms<1000?Math.round(ms)+'ms':ms<60000?(ms/1000).toFixed(ms<10000?1:0)+'s':secs(ms);
 // Time left: each test that hasn't finished costs what it took last run, or the average so far.
+// The running test counts down only to zero, so one slow test can't eat the time of the tests after it.
 function timeLeft(){if(!total||finished)return null;const avg=doneN?doneMs/doneN:null;let left=0,unknown=0;
-  groups.forEach(o=>o.items.forEach(it=>{if(it.done)return;const ms=it.prevMs??avg;if(ms==null){unknown++;return}left+=ms}));
-  if(unknown)return null;if(cur&&cur.at!=null)left=Math.max(0,left-(clock-cur.at));return left}
+  groups.forEach(o=>o.items.forEach(it=>{if(it.done)return;let ms=it.prevMs??avg;if(ms==null){unknown++;return}
+    if(it===cur&&it.at!=null)ms=Math.max(0,ms-(clock-it.at));left+=ms}));
+  return unknown?null:left}
 const GUT=44;
 // Every test is a square in its feature's row, in run order, so the whole run is one picture that fills in.
 // Brightness is how long the test took, on a log scale fixed from the last run (it changes once, in one step,
@@ -576,7 +579,9 @@ function connect(){
   es.addEventListener('hello',e=>{const h=JSON.parse(e.data);offset=h.serverNow-Date.now();
     latestId=h.latest;const want=PIN||h.latest;if(want&&(!R||R.id!==want))load(want).then(loadRuns);else if(R)load(R.id);loadRuns()});
   es.onmessage=e=>{const ev=JSON.parse(e.data);
-    if(ev.type==='run-start'){latestId=ev.run;refreshRuns()}else if(ev.type==='run-end')refreshRuns();
+    if(ev.type==='run-start'){latestId=ev.run;refreshRuns()}else if(ev.type==='run-end'||ev.type==='run-resume')refreshRuns();
+    // A run marked interrupted that spoke again: its stand-in ending is gone, so read it again.
+    if(ev.type==='run-resume'){if(R&&R.id===ev.run&&!loading)load(R.id);return}
     if(loading){if(ev.run===loading)pend.push(ev);return}
     // A new run takes over once the one on screen has finished.
     if(ev.type==='run-start'&&!PIN&&(!R||(R.id!==ev.run&&R.endRel!=null))){load(ev.run).then(loadRuns);return}
