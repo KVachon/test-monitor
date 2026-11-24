@@ -55,6 +55,16 @@ test.describe('names', () => {
     assert.strictEqual(N.projectName({ opt: {}, config: {}, cwd: '/x/y', e: {}, git: none }), 'y');
   });
 
+  test('suites that share a project of their own file the run under it', () => {
+    const git = () => ({});
+    const base = { opt: {}, config: { project: 'smart-home' }, e: {}, git };
+    assert.strictEqual(N.projectName({ ...base, suites: [{ name: 'a', project: 'SITREP' }] }), 'SITREP');
+    assert.strictEqual(N.projectName({ ...base, suites: [{ project: 'SITREP' }, { project: 'SITREP' }] }), 'SITREP');
+    assert.strictEqual(N.projectName({ ...base, suites: [{ project: 'SITREP' }, {}] }), 'smart-home');
+    assert.strictEqual(N.projectName({ ...base, suites: [{ project: 'SITREP' }, { project: 'X' }] }), 'smart-home');
+    assert.strictEqual(N.projectName({ ...base, opt: { project: 'cli' }, suites: [{ project: 'SITREP' }] }), 'cli');
+  });
+
   test('a real git checkout is named after its origin remote, not its folder', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kt-git-'));
     try {
