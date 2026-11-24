@@ -90,7 +90,7 @@ Put it in the project root. `kurtest` with no arguments runs every suite in it, 
 
 | Field | Meaning |
 | --- | --- |
-| `project` | The project's name on the page. Defaults to the folder name. |
+| `project` | The project's name on the page. Defaults to the git repository's name (from its `origin` remote), then the folder name. `--project` and `KURTEST_PROJECT` override it. |
 | `url` | Where this project's runs go, if not this machine. |
 | `suites[].name` | Short name, used on the command line. |
 | `suites[].label` | What the page calls it. Defaults to the name. |
