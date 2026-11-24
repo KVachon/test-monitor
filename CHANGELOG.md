@@ -12,4 +12,6 @@ First public release, as KurTest. It was a personal tool called Test Monitor bef
 - Fonts are bundled, so the page works offline.
 - The old Test Monitor names keep working.
 - A run whose sender disappears ends as interrupted instead of running forever; `kurtest` sends a heartbeat, handles a closed terminal, and keeps events through a short network outage instead of dropping the rest of the run.
+- A run with no project set is filed under its git repository's name, as the remote spells it, instead of the folder it ran in, so a clone in a scratch folder or a differently-cased folder lands with the rest of that repo's runs. `KURTEST_PROJECT` sets it for a whole shell.
+- A suite can name its own `project`, so one repo's suites can report to several projects.
 - Time left no longer drops to 0s when one test runs longer than last time.

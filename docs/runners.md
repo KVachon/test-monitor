@@ -90,11 +90,12 @@ Put it in the project root. `kurtest` with no arguments runs every suite in it, 
 
 | Field | Meaning |
 | --- | --- |
-| `project` | The project's name on the page. Defaults to the folder name. |
+| `project` | The project's name on the page. Defaults to the git repository's name (from its `origin` remote), then the folder name. `--project` and `KURTEST_PROJECT` override it. |
 | `url` | Where this project's runs go, if not this machine. |
 | `suites[].name` | Short name, used on the command line. |
 | `suites[].label` | What the page calls it. Defaults to the name. |
 | `suites[].command` | The command to run. |
+| `suites[].project` | Files a run of only this suite (or of suites that all name the same project) under that project instead, for a repo that holds tests for more than one project. |
 | `suites[].cwd` | Folder to run it in, relative to `.kurtest.json`. |
 | `suites[].shell` | The shell for the command, for example `bash` for `.sh` scripts on Windows. |
 | `suites[].reader` | `auto` (the default: TAP and `@@kurtest` lines), `tap`, `marker`, or `pattern`. |
