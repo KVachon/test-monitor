@@ -20,13 +20,13 @@ Body: a JSON array of [events](events.md), one event, or JSON lines (8 MB at mos
 
 ### `GET /api/runs`
 
-The newest runs first: `{"runs": [...], "total": 42, "projects": ["my-app", ...]}`. Each run has `id`, `project`, `command`, `host`, `started` and `ended` (ms since the epoch; `ended` is 0 while running), `status` (`pass`, `fail`, `stopped`, or empty while running), `counts` (`pass`, `fail`, `skip`, `flaky`) and `durationMs`.
+The newest runs first: `{"runs": [...], "total": 42, "projects": ["my-app", ...]}`. Each run has `id`, `project`, `command`, `host`, `started` and `ended` (ms since the epoch; `ended` is 0 while running), `status` (`pass`, `fail`, `stopped`, `interrupted`, or empty while running), `counts` (`pass`, `fail`, `skip`, `flaky`) and `durationMs`.
 
 Query: `?project=` narrows it; `?limit=` (default 50).
 
 ### `GET /api/runs/<id>`
 
-One run: `{"meta": {...}, "events": [...], "previous": {...} | null, "serverNow": 1700000000000}`. `events` have KurTest's time `t` and a sequence number `seq`. `previous` summarises the last finished run of the same project and command (its suites, tests and duration), which the page uses to lay itself out and estimate time left.
+One run: `{"meta": {...}, "events": [...], "previous": {...} | null, "serverNow": 1700000000000}`. `events` have KurTest's time `t` and a sequence number `seq`. `previous` summarises the last finished (not interrupted) run of the same project and command (its suites, tests and duration), which the page uses to lay itself out and estimate time left.
 
 ### `GET /api/history`
 

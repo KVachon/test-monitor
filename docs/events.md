@@ -21,6 +21,9 @@ Every event has `type` and `run`. Senders add `at`, their clock in milliseconds 
 
 {"type":"suite-end","run":"…","suite":"api"}
 {"type":"run-end","run":"…","status":"fail"}   // pass | fail | stopped
+
+// optional, while the run is open: "still here", every 30 seconds or so. Not stored.
+{"type":"heartbeat","run":"…"}
 ```
 
 Notes:
@@ -28,6 +31,7 @@ Notes:
 - Send `test-end` once per test, with the final result. A test that is retried and then passes is `flaky`, not two events.
 - The plan in `suite-start` is optional. Without it, KurTest lays the grid out from the last run of the same project and command, so the layout is stable from the second run on.
 - `ms` is optional. Without it, KurTest uses the time between `test-start` and `test-end`.
+- A run that never sends `run-end` (the sender was killed, its terminal closed, its machine slept) ends as `interrupted`, at the last event it sent: 2 minutes after its last event or heartbeat if it has sent heartbeats, 30 minutes otherwise. If it speaks again, it carries on. `kurtest` sends heartbeats for you.
 - Run ids are 1 to 120 characters of `A-Z a-z 0-9 . _ : -`.
 - Unknown fields are ignored, so a runner can add its own.
 
